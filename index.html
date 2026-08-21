@@ -701,6 +701,25 @@ const LOADUNIT = {
 };
 EX.forEach(e=> e.loadUnit = LOADUNIT[e.id] || 'single');
 
+/* サブグループ。arm/shoulder/legsは「同じ大分類でも実際は異なる筋を狙う種目」が
+   混在しており、標準の自動生成がこれを区別せず選ぶと、二頭筋が丸ごと抜けたり
+   スクワット系が一切選ばれなかったりする（composeMuscleのサブグループ振り分けで使用）。
+   DETAILの記述と矛盾しないよう、その内容に沿って分類している。 */
+const SUBGROUP = {
+  bcurl:'biceps', ez_curl:'biceps', drag_curl:'biceps', preacher_curl:'biceps',
+  dcurl:'biceps', inc_c:'biceps', conc_curl:'biceps', ccurl:'biceps',
+  nbp:'triceps', skull:'triceps', pdown:'triceps', ohext:'triceps', dip_tri:'triceps',
+  ohp:'front', smith_shp:'front', dshp:'front', shmc:'front', front_lat:'front',
+  btn_press:'side', side:'side', clr:'side', upright:'side',
+  rear:'rear', rear_pec:'rear',
+  shrug:'trap',
+  sq:'quad', front_sq:'quad', hack_sq:'quad', sissy:'quad', lp:'quad',
+  bsq:'quad', lunge:'quad', lext:'quad', bwsq:'quad',
+  rdl:'ham', sldl:'ham', lcurl:'ham',
+  calf_raise:'calf'
+};
+EX.forEach(e=> e.sub = SUBGROUP[e.id] || null);
+
 /* 解説動画。種目IDをキーに、その種目のフォーム／テクニックを解説している動画を紐づける。
    URLをそのまま持たず、動画ID(11桁)と秒数(整数)だけを持って組み立てる。
    長いURLは真偽の検証ができないが、IDと整数なら人間が確認できるため。
@@ -1303,22 +1322,53 @@ function exercisePhase(e){
   if(e.c)   return 1; // ②高重量・高張力：コンパウンド
   return 2;            // ③パンプ・代謝ストレス：アイソレーション（pmpタグ含む）
 }
-function orderPicks(pool, salt, seed){
+function shuffle(pool, salt, seed){
   return [...pool].map((v,i)=>[v, Math.sin((i+1)*97.31 + seed*13.7 + salt)])
-    .sort((a,b)=>a[1]-b[1]).map(x=>x[0])
+    .sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
+}
+function orderPicks(pool, salt, seed){
+  return shuffle(pool, salt, seed)
     .sort((a,b)=>exercisePhase(a)-exercisePhase(b)); // Array.sortは安定ソートなので、段階内のシャッフル順は保たれる
 }
-function composeMuscle({method, plan, pool, target, secBudget, hardCap, rest, seed, salt}){
+/* 選定専用の順番。orderPicks（表示順＝準備→複合→追い込み）をそのまま選定にも使うと、
+   ストレッチ系タグの本数がmaxBlocksとたまたま一致する部位（例：脚のsissy/rdl/sldlが
+   ちょうど3種目）で、複合種目（スクワット等）が毎回一切選ばれなくなる。
+   選定はサブグループ（二頭/三頭、前部/側部/後部、四頭/ハム等）のラウンドロビンにし、
+   各グループ内は複合種目を優先する。表示順への並び替えはcomposeMuscle側で選定後に行う。
+   サブグループタグを持たない部位（胸・背中・体幹・臀部）は従来どおりorderPicksを使う。 */
+function selectionOrder(pool, salt, seed, weekUsedSub){
+  const bySub={}, order=[];
+  shuffle(pool, salt, seed).forEach(e=>{
+    const k=e.sub||'_';
+    if(!bySub[k]){ bySub[k]=[]; order.push(k); }
+    bySub[k].push(e);
+  });
+  order.forEach(k=> bySub[k].sort((a,b)=>(b.c||0)-(a.c||0))); // 各グループ内：複合種目を優先（安定ソート）
+  order.sort((a,b)=>{ // 今週まだ登場していないサブグループを優先（部位が週複数日にまたがる場合向け）
+    const ua=weekUsedSub&&weekUsedSub.has(a)?1:0, ub=weekUsedSub&&weekUsedSub.has(b)?1:0;
+    return ua-ub;
+  });
+  const res=[]; let more=true;
+  while(more){ more=false; order.forEach(k=>{ if(bySub[k].length){ res.push(bySub[k].shift()); more=true; } }); }
+  return res;
+}
+function composeMuscle({method, plan, pool, target, secBudget, hardCap, rest, seed, salt, weekUsed, weekUsedSub}){
   const ctx={workSec:method.workSec, rest, target};
-  const blocks=[]; let eff=0, sec=0; const used=new Set();
-  const ordered=orderPicks(pool, salt, seed); let i=0;
+  const blocks=[]; let eff=0, sec=0; const used=new Set(weekUsed||[]);
+  const hasSub = pool.some(e=>e.sub);
+  const ordered = hasSub ? selectionOrder(pool, salt, seed, weekUsedSub) : orderPicks(pool, salt, seed);
+  let i=0;
   const next=()=>{while(i<ordered.length&&used.has(ordered[i].id))i++;return ordered[i]||null;};
   const push=b=>{ if(!b||sec+b.sec>hardCap||sec+b.sec>secBudget&&blocks.length) return false;
                   blocks.push(b);eff+=b.eff;sec+=b.sec;return true; };
   while(eff<target && blocks.length<(plan.maxBlocks||3)){
     const e=next(); if(!e) break; used.add(e.id);
-    if(!push(makeBlock(plan.unit,[e],ctx))) break;
+    const b=makeBlock(plan.unit,[e],ctx);
+    if(!push(b)) break;
+    if(weekUsed) weekUsed.add(e.id);
+    if(weekUsedSub && e.sub) weekUsedSub.add(e.sub);
   }
+  blocks.sort((a,b)=>exercisePhase(a.exs[0])-exercisePhase(b.exs[0])); // 選定後に表示順（準備→複合→追い込み）へ並び替え
   return {blocks, eff, sec};
 }
 
@@ -1530,6 +1580,9 @@ function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWei
   // 標準：自動生成
   const poolByMuscle={}; MORDER.forEach(m=>poolByMuscle[m]=EX.filter(e=>e.m===m&&available(e)));
   const split = SPLITS[days];
+  /* 部位が週内で複数日にまたがる場合（3分割の腕：プッシュ＋プル等）に、
+     同じ種目・同じサブグループばかり選ばれるのを防ぐための週単位の記録 */
+  const weekUsed={}, weekUsedSub={}; MORDER.forEach(m=>{weekUsed[m]=new Set(); weekUsedSub[m]=new Set();});
   const appear={}; MORDER.forEach(m=>appear[m]=split.filter(d=>d.m.includes(m)).length||0);
   const plans = split.map((d,di)=>{
     const need=d.m.map(m=>goal.need[m]/(appear[m]||1));
@@ -1539,7 +1592,8 @@ function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWei
       if(!poolByMuscle[m].length) return null;
       const share=secPerDay*(need[mi]/sum)+carry;
       const r=composeMuscle({method, plan:method.plan, pool:poolByMuscle[m], target:need[mi],
-              secBudget:Math.min(share,remaining), hardCap:remaining, rest, seed, salt:di*7+mi});
+              secBudget:Math.min(share,remaining), hardCap:remaining, rest, seed, salt:di*7+mi,
+              weekUsed:weekUsed[m], weekUsedSub:weekUsedSub[m]});
       carry=share-r.sec; remaining-=r.sec;
       return {m, ...r};
     }).filter(g=>g&&g.blocks.length);
