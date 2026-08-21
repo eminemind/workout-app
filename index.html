@@ -1,0 +1,2493 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設備から組む週間メニュー — プロトタイプ v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@110..125,500..900&family=Noto+Sans+JP:wght@400;500;700;900&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#E4E6E1; --surface:#FAFAF8; --surface-2:#EEF0EB;
+  --ink:#15181A; --muted:#6E747A; --rule:#C7CBC3; --rule-strong:#15181A;
+  --m-chest:#C8102E; --m-back:#0057B8; --m-shoulder:#E8A200;
+  --m-legs:#00803A; --m-arm:#5B2C8D; --m-glute:#A8501E; --m-core:#7C838A;
+  --display:'Archivo','Noto Sans JP',system-ui,sans-serif;
+  --hand:'Caveat','Noto Sans JP',cursive;
+  --body:'Noto Sans JP',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;line-height:1.2}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.num{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 800}
+
+.masthead{border-bottom:2px solid var(--rule-strong);padding:36px 0 22px}
+.eyebrow{font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 700;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;user-select:none}
+.masthead h1{font-weight:900;font-size:clamp(26px,4.3vw,46px);letter-spacing:-.02em;min-height:1.2em;transition:opacity .25s}
+.masthead h1.fade{opacity:0}
+.attrib{font-size:12px;color:var(--muted);margin:14px 0 0!important;padding-left:14px;border-left:2px solid var(--rule-strong);line-height:1.6}
+.attrib b{color:var(--ink);font-weight:700}
+.attrib .disc{display:block;font-size:11px;margin-top:3px}
+.masthead p{max-width:62ch;color:var(--muted);margin:12px 0 0;font-size:14px}
+
+.cols{display:grid;grid-template-columns:368px 1fr;align-items:start}
+.panel{border-right:1px solid var(--rule);padding:28px 28px 60px 0;position:sticky;top:0;max-height:100vh;overflow-y:auto}
+.results{padding:28px 0 90px 32px;min-width:0}
+@media(max-width:940px){.cols{grid-template-columns:1fr}
+  .panel{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--rule);padding:24px 0 32px}
+  .results{padding:28px 0 80px}}
+
+.step{margin-bottom:30px}
+.step-head{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+.step-no{font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 800;font-size:12px;color:var(--muted);letter-spacing:.06em}
+.step-title{font-weight:700;font-size:14px}
+.hint{font-size:12px;color:var(--muted);margin:-2px 0 10px;line-height:1.55}
+.hint b{color:var(--ink);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--rule);background:var(--surface);padding:5px 10px;cursor:pointer;font-size:12px;user-select:none;transition:.12s}
+.chip:hover{border-color:var(--muted)}
+.chip input{position:absolute;opacity:0;width:0;height:0}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.chip.need{border-color:var(--ink);border-style:dashed}
+.chip:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.field{flex:1;min-width:92px}
+.field.hide{display:none}
+.hide{display:none!important}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px}
+.field select{width:100%;background:var(--surface);border:1px solid var(--rule);padding:8px 9px;font-size:13px;font-weight:500}
+.field select:focus{outline:2px solid var(--ink);outline-offset:1px}
+.field select:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed}
+
+.mcard{border-left:3px solid var(--ink);background:var(--surface);padding:11px 13px;margin-top:11px;font-size:12px;line-height:1.65}
+.mcard .by{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 700;font-size:10.5px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px}
+.mcard .sig{display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule)}
+.mcard .sig b{font-weight:700}
+.mcard .warn{display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--rule);color:var(--muted)}
+.fixbtn{margin-top:9px;width:100%;background:var(--ink);color:var(--surface);border:0;padding:8px;cursor:pointer;font-weight:700;font-size:12px}
+.reroll{margin-top:4px;width:100%;background:var(--surface);border:1px solid var(--rule-strong);padding:10px;cursor:pointer;font-weight:700;font-size:13px;transition:.12s}
+.reroll:hover{background:var(--ink);color:var(--surface)}
+.reroll:disabled{opacity:.4;cursor:not-allowed;background:var(--surface)}
+
+/* 思想の座標（左パネル内・コンパクト版） */
+.philbox{margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)}
+.philbox > h4{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800}
+.philbox > .sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+.axis{position:relative;height:84px;margin-bottom:6px}
+.axis-line{position:absolute;left:0;right:0;top:40px;height:1px;background:var(--rule-strong)}
+.axis-end{position:absolute;top:52px;font-size:10.5px;color:var(--muted);max-width:44%;line-height:1.4}
+.axis-end.l{left:0}.axis-end.r{right:0;text-align:right}
+.axis-dot{position:absolute;top:34px;width:12px;height:12px;margin-left:-6px;padding:0;border-radius:50%;background:var(--surface);border:1.5px solid var(--muted);cursor:pointer;transition:.15s}
+.axis-dot:hover{border-color:var(--ink);transform:scale(1.3)}
+.axis-dot.on{background:var(--ink);border-color:var(--ink);transform:scale(1.4)}
+.axis-tag{position:absolute;top:0;white-space:nowrap;font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:12px;transition:.3s}
+.axis-tag small{display:block;font-variation-settings:'wdth' 112,'wght' 500;font-size:10px;color:var(--muted)}
+.pcard{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--ink);padding:12px 13px;margin-top:10px;font-size:12px;line-height:1.75}
+.pcard.opp{border-left-color:var(--rule)}
+.pcard .who{display:block;font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.pcard h5{font-size:13px;font-weight:700;margin:0 0 7px}
+.pcard p{margin:0}
+.pcard .enemy{border-top:1px solid var(--rule);margin-top:9px;padding-top:8px;font-size:11px;color:var(--muted)}
+.pcard .enemy b{color:var(--ink);font-weight:700}
+.hand-quote{font-family:var(--hand);font-size:15px;color:var(--ink);font-weight:600}
+.tap-hint{display:inline-block;margin-top:3px;font-size:10.5px;color:var(--muted);opacity:.8}
+#headline{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+#attrib{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+
+.ledger{margin-bottom:34px}
+.ledger-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--rule);padding-bottom:6px;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.ledger-head h2{font-size:13px;font-weight:700}
+.ledger-head .unit{font-size:11px;color:var(--muted);letter-spacing:.08em;font-family:var(--display);font-variation-settings:'wdth' 120,'wght' 600}
+.rail-outer{position:relative;padding-top:26px;padding-bottom:8px}
+.rail{position:relative;height:46px;background:var(--surface-2);border:1px solid var(--rule)}
+.rail-fill{position:absolute;inset:0;display:flex;overflow:hidden}
+.seg{height:100%;width:0;transition:width .45s cubic-bezier(.2,.7,.3,1);position:relative}
+.seg span{position:absolute;left:6px;top:50%;transform:translateY(-50%);color:#fff;font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 800;font-size:12px;opacity:0;transition:opacity .2s}
+.seg.wide span{opacity:1}
+.overflow{position:absolute;top:0;bottom:0;width:0;background:repeating-linear-gradient(-45deg,transparent 0 5px,rgba(21,24,26,.85) 5px 7px);border-left:2px solid var(--rule-strong);transition:.45s cubic-bezier(.2,.7,.3,1)}
+.cap{position:absolute;top:-26px;bottom:-8px;width:2px;background:var(--rule-strong);transition:left .45s cubic-bezier(.2,.7,.3,1)}
+.cap b{position:absolute;top:0;left:6px;white-space:nowrap;font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:11px}
+.cap.flip b{left:auto;right:6px}
+.legend{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:14px}
+.lg{display:flex;align-items:center;gap:6px;font-size:12px}
+.dot{width:9px;height:9px;flex:none}
+.lg em{font-style:normal;font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 700;color:var(--muted)}
+.lg em.short{color:var(--ink)}
+.score-bars{display:flex;flex-direction:column;gap:10px;padding:6px 0}
+.score-row{display:grid;grid-template-columns:64px 1fr 44px;gap:10px;align-items:center}
+.score-label{font-size:12px;color:var(--muted)}
+.score-track{height:22px;background:var(--surface-2);border:1px solid var(--rule);position:relative}
+.score-target{position:absolute;top:-3px;bottom:-3px;width:2px;background:repeating-linear-gradient(var(--ink),var(--ink) 3px,transparent 3px,transparent 6px);z-index:2}
+.score-target-lg{display:inline-block;width:14px;height:2px;background:repeating-linear-gradient(90deg,var(--ink),var(--ink) 3px,transparent 3px,transparent 6px);vertical-align:middle;margin-right:2px}
+.score-val small{display:block;font-variation-settings:'wdth' 110,'wght' 500;font-size:9.5px;color:var(--muted);text-align:right}
+.score-fill{height:100%;transition:width .4s cubic-bezier(.2,.7,.3,1)}
+.score-val{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 800;font-size:13px;text-align:right}
+.convnote{font-size:11.5px;color:var(--muted);padding:10px 14px;border-top:1px solid var(--rule);line-height:1.7}
+
+.empty{border:1px dashed var(--rule);padding:26px;text-align:center;color:var(--muted);font-size:13px}
+
+.verdict{border-top:2px solid var(--rule-strong);margin-top:22px;padding-top:16px}
+.verdict-tag{display:inline-block;font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 900;font-size:12px;letter-spacing:.16em;text-transform:uppercase;padding:3px 9px;border:1.5px solid var(--rule-strong);margin-bottom:10px}
+.verdict-tag.ng{background:var(--rule-strong);color:var(--surface)}
+.verdict p{margin:0 0 8px;font-size:14px;max-width:66ch}
+.notes{margin:10px 0 0;padding:0;list-style:none}
+.notes li{font-size:12.5px;color:var(--muted);padding-left:16px;position:relative;margin-bottom:5px}
+.notes li::before{content:'';position:absolute;left:0;top:.62em;width:8px;height:1px;background:var(--muted)}
+.notes li.strong{color:var(--ink)}
+
+.conv{margin-top:22px;border:1px solid var(--rule);background:var(--surface)}
+.conv h3{font-size:11.5px;font-weight:700;padding:10px 14px;border-bottom:1px solid var(--rule)}
+.conv table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.conv td{padding:9px 14px;border-bottom:1px solid var(--surface-2);vertical-align:top}
+.conv tr:last-child td{border-bottom:0}
+.conv td:nth-child(1){width:26%;font-weight:700}
+.conv td:nth-child(2){font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 800;width:30%;text-align:right;white-space:normal;word-break:keep-all;line-height:1.5}
+.conv td:nth-child(3){color:var(--muted);font-size:11.5px;width:44%;line-height:1.6}
+.conv tr.on td{background:var(--surface-2)}
+/* 数式など長い文字列が入る表は、右列の数値を左寄せ・幅広にして縦潰れを防ぐ */
+.conv table.wide td:nth-child(2){text-align:left;width:38%}
+.conv table.wide td:nth-child(1){width:22%}
+.conv table.wide td:nth-child(3){width:40%}
+@media(max-width:520px){
+  .conv table{table-layout:auto}
+  .conv td{display:block;width:auto!important;padding:4px 14px}
+  .conv td:nth-child(1){padding-top:10px;border-top:1px dashed var(--rule)}
+  .conv td:nth-child(2){text-align:left}
+}
+
+.menu{margin-top:40px}
+.menu > h2{font-size:13px;font-weight:700;border-bottom:1px solid var(--rule);padding-bottom:6px;margin-bottom:16px;display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.menu > h2 span{font-weight:500;color:var(--muted);font-size:11.5px}
+.rotnote{font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--ink);padding:10px 13px;margin:0 0 18px;line-height:1.7}
+.rotnote b{color:var(--ink)}
+.day{margin-bottom:24px;background:var(--surface);border:1px solid var(--rule)}
+.day-head{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.day-no{font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 900;font-size:22px;line-height:1}
+.day-name{font-weight:700;font-size:14px;flex:1;min-width:120px}
+.day-meta{font-size:11.5px;color:var(--muted);font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 600;white-space:nowrap}
+.day-meta.over{color:var(--ink);font-variation-settings:'wdth' 118,'wght' 800}
+
+.blk{border-bottom:1px solid var(--surface-2)}
+.blk:last-child{border-bottom:0}
+.blk.blocked{opacity:.55}
+.ord-b.del{color:var(--muted);margin-left:auto}
+.ord-b.del:hover{background:#7a2020;color:var(--surface);border-color:#7a2020}
+.add-ex-btn{display:block;width:100%;margin-top:0;background:var(--surface);border:1px dashed var(--rule-strong);border-width:0;border-top-width:1px;padding:10px;cursor:pointer;font-size:12.5px;color:var(--ink);font-weight:700}
+.add-ex-btn:hover{background:var(--surface-2)}
+.ordbox{display:inline-flex;gap:2px;margin-left:auto}
+.ord-b{border:1px solid var(--rule);background:var(--surface);width:20px;height:20px;line-height:1;padding:0;cursor:pointer;font-size:10px;color:var(--muted)}
+.ord-b:hover:not(:disabled){background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.ord-b:disabled{opacity:.3;cursor:not-allowed}
+.ord-b.sm{width:19px;height:19px;margin-right:3px}
+.blk-list{position:relative}
+.drag-h{cursor:grab;touch-action:none;color:var(--muted);font-size:12px;letter-spacing:-2px;padding:2px 4px;user-select:none;border:1px solid var(--rule);background:var(--surface);line-height:1}
+.drag-h:active{cursor:grabbing}
+.drag-h-ex{cursor:grab;touch-action:none;color:var(--muted);font-size:13px;padding:2px 3px;user-select:none;flex:none;align-self:center}
+.drag-h-ex:active{cursor:grabbing}
+.blk.floating{
+  opacity:.86; box-shadow:0 14px 30px rgba(21,24,26,.32),0 2px 8px rgba(21,24,26,.18);
+  transform:scale(1.015) rotate(-.4deg); pointer-events:none; z-index:999;
+  background:var(--surface); border:1px solid var(--rule-strong);
+}
+.ex.floating{
+  opacity:.86; box-shadow:0 10px 22px rgba(21,24,26,.3);
+  transform:scale(1.02) rotate(-.3deg); pointer-events:none; z-index:999;
+  background:var(--surface); border:1px solid var(--rule-strong);
+}
+.drag-placeholder{
+  border:2px dashed var(--muted); background:var(--surface-2); box-sizing:border-box;
+  border-radius:2px; margin:2px 0;
+}
+.ex-list{position:relative}
+.blk-head{display:flex;align-items:baseline;gap:8px;padding:9px 16px 3px;flex-wrap:wrap}
+.blk-kind{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--rule);padding:1px 6px;color:var(--muted)}
+.blk-kind.miss{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.blk-desc{font-size:11.5px;color:var(--muted)}
+.ex{display:grid;grid-template-columns:auto 4px 1fr auto auto;gap:0 12px;align-items:center;padding:9px 16px 9px 0}
+.ex:not(:has(.drag-h-ex)){grid-template-columns:4px 1fr auto auto}
+.ex + .ex{border-top:1px dotted var(--rule)}
+.ex-bar{width:4px;align-self:stretch;min-height:26px}
+.ex-name{font-size:13.5px;font-weight:500;min-width:0}
+.ex-name small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.ex-name small .detail{color:var(--ink);font-weight:700;font-style:normal}
+.sigmark{font-size:10px;border:1px solid var(--rule);padding:0 5px;margin-left:6px;color:var(--muted);vertical-align:1px}
+.ex-sets{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:14px;white-space:nowrap}
+.ex-sets small{display:block;font-variation-settings:'wdth' 112,'wght' 500;font-size:10.5px;color:var(--muted);text-align:right}
+.wt-wrap{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin:3px 0 1px}
+.wt-input{width:44px;text-align:right;
+  font-family:var(--display);font-variation-settings:'wdth' 112,'wght' 700;font-size:12px;
+  border:1px solid var(--rule);background:var(--surface);padding:2px 5px;color:var(--ink)}
+.wt-input::placeholder{color:var(--muted);font-weight:500}
+.wt-input:focus{outline:2px solid var(--ink);outline-offset:1px}
+.wt-input:not(:placeholder-shown){border-color:var(--ink);font-weight:800}
+.wt-unit{font-size:9.5px;color:var(--muted);white-space:normal;text-align:right;line-height:1.3;font-family:var(--body)}
+.ex-swap{border:1px solid var(--rule);background:transparent;padding:5px 8px;font-size:11.5px;cursor:pointer;white-space:nowrap;transition:.12s;margin-right:6px}
+.ex-swap:hover{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.ex-swap.alert{border-color:var(--ink);border-style:dashed;font-weight:700}
+.ex-acts{display:flex;gap:0;align-items:center}
+.ex-name .swapped{font-size:10px;border:1px solid var(--ink);padding:0 5px;margin-left:6px;vertical-align:1px}
+.swaplist{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule)}
+.swaplist button{display:flex;justify-content:space-between;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--surface-2);padding:10px 13px;cursor:pointer;font-size:13px}
+.swaplist button:last-child{border-bottom:0}
+.swaplist button:hover{background:var(--surface-2)}
+.swaplist button.act{background:var(--ink);color:var(--surface);font-weight:700}
+.swaplist small{color:var(--muted);font-size:11px}
+.swaplist button.act small{color:var(--surface)}
+.swaphead{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+.fitline{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;cursor:pointer;user-select:none}
+.fitline input{width:15px;height:15px;accent-color:var(--ink)}
+.added-badge{font-size:10px;border:1px solid var(--muted);padding:0 5px;margin-left:6px;color:var(--muted);vertical-align:1px}
+.resetsw{margin-top:8px;width:100%;background:var(--surface);border:1px dashed var(--rule-strong);padding:8px;cursor:pointer;font-size:12px}
+.save-step{margin-top:22px;padding-top:18px;border-top:2px solid var(--rule-strong)}
+.savebtn{display:block;width:100%;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:8px}
+.savebtn:first-of-type{margin-top:4px}
+.savebtn:not(.outline){background:var(--ink);color:var(--surface);border:0}
+.savebtn:not(.outline):hover{opacity:.88}
+.savebtn.outline{background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong)}
+.savebtn.outline:hover{background:var(--surface-2)}
+.ex-edit{border:1px solid var(--rule);background:transparent;padding:5px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;transition:.12s}
+.ex-edit:hover{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.ex-vid{border:1px solid var(--rule);background:transparent;padding:5px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;transition:.12s}
+.ex-vid:hover{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.blk-foot{font-size:11.5px;color:var(--muted);padding:8px 16px 10px;background:var(--surface-2);border-top:1px solid var(--rule)}
+.blk-foot b{color:var(--ink);font-family:var(--display);font-variation-settings:'wdth' 120,'wght' 800}
+@media(max-width:600px){.ex{grid-template-columns:auto 4px 1fr auto;row-gap:8px}.ex:not(:has(.drag-h-ex)){grid-template-columns:4px 1fr auto}.ex-vid{grid-column:1/-1;justify-self:start}}
+
+.modal{position:fixed;inset:0;background:rgba(21,24,26,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal.on{display:flex}
+.sheet{background:var(--surface);border:1px solid var(--rule-strong);max-width:640px;width:100%;max-height:90vh;overflow-y:auto}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 20px;border-bottom:1px solid var(--rule)}
+.sheet-head h3{font-size:16px;font-weight:700}
+.sheet-head .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+.x{background:none;border:0;font-size:22px;cursor:pointer;line-height:1;padding:0 4px;color:var(--muted)}
+.sheet-body{padding:20px}
+.frame{aspect-ratio:16/9;background:var(--surface-2);border:1px solid var(--rule);margin-bottom:16px;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+.frame iframe{width:100%;height:100%;border:0;display:block}
+.frame .ph{font-size:12.5px;color:var(--muted);max-width:40ch;line-height:1.7}
+.frame-fallback{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;color:var(--muted);margin:-8px 0 16px}
+.frame-fallback a{color:var(--ink);font-weight:700}
+.kv{border-top:1px solid var(--rule);padding-top:12px}
+.kv div{display:flex;gap:10px;font-size:12px;padding:3px 0}
+.kv b{color:var(--muted);font-weight:500;min-width:100px;flex:none}
+.kv code{font-family:var(--display);font-variation-settings:'wdth' 110,'wght' 600;background:var(--surface-2);padding:1px 5px;word-break:break-all}
+.kv code a{color:inherit}
+.play-row{display:flex;gap:8px;margin-bottom:14px}
+.play-row input{flex:1;background:var(--surface);border:1px solid var(--rule);padding:8px 10px;font-size:13px}
+.play-row button{background:var(--ink);color:var(--surface);border:0;padding:8px 16px;cursor:pointer;font-weight:700;font-size:13px}
+.play-row.alt{margin-top:14px;margin-bottom:0;opacity:.7}
+.play-row.alt:hover{opacity:1}
+.clip-lead{font-size:13px;line-height:1.8;margin:0 0 14px;padding-left:11px;border-left:2px solid var(--rule-strong)}
+.marks{margin-bottom:16px}
+.marks-h{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.mark-b{display:block;width:100%;text-align:left;background:transparent;border:1px solid var(--rule);border-bottom:0;padding:7px 10px;font-size:12.5px;cursor:pointer;color:var(--ink);transition:.12s;font-family:inherit}
+.mark-b:last-child{border-bottom:1px solid var(--rule)}
+.mark-b:hover{background:var(--surface-2)}
+.mark-b.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.mark-b .tc{font-family:var(--display);font-variation-settings:'wdth' 110,'wght' 700;font-size:11px;color:var(--muted);margin-right:10px}
+.mark-b.on .tc{color:var(--surface);opacity:.75}
+.cue-block{margin-bottom:14px}
+.cue-block h5{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.cue-block ul{margin:0;padding-left:18px}
+.cue-block li{font-size:12.5px;line-height:1.75;margin-bottom:3px}
+.cue-block.ng li{color:var(--m-chest)}
+.clip-note{font-size:11px;line-height:1.7;color:var(--muted);border-top:1px solid var(--rule);padding-top:10px;margin:0 0 4px}
+.ex-vid.has-clip{border-color:var(--ink);font-weight:700}
+.ex-vid.has-clip::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ink);margin-right:6px;vertical-align:middle}
+.ex-vid.has-clip:hover::before{background:var(--surface)}
+
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translate(-50%,12px);
+  background:var(--ink); color:var(--surface); padding:12px 20px;
+  font-size:13px; font-weight:700; z-index:2000; opacity:0;
+  transition:opacity .3s, transform .3s; box-shadow:0 8px 22px rgba(21,24,26,.3);
+}
+.toast.on{opacity:1; transform:translate(-50%,0)}
+
+.pdf-export{margin-top:44px;border-top:2px solid var(--rule-strong);padding-top:20px}
+.pdf-btn{background:var(--ink);color:var(--surface);border:0;padding:13px 22px;font-weight:700;font-size:14px;cursor:pointer}
+.pdf-btn:hover{opacity:.88}
+.pdf-btn:disabled{opacity:.4;cursor:not-allowed}
+.pdf-export .hint{margin:8px 0 0}
+
+#printArea{display:none}
+
+@media print{
+  body *{visibility:hidden}
+  #printArea, #printArea *{visibility:visible}
+  #printArea{display:block;position:absolute;top:0;left:0;width:100%;margin:0;padding:0}
+  @page{size:landscape;margin:8mm}
+}
+
+/* 1枚に全日程を収めるためのシート。日ごとにカラムを分け、内容量に応じてJSでフォントサイズを縮小する。 */
+.sheet-page{
+  width:277mm; /* A4横 297mm − 左右余白8mm×2 の目安。画面上の計測用サイズでもある */
+  margin:0 auto; font-family:'Noto Sans JP',serif; color:#111;
+  border:2px solid #111; padding:0; box-sizing:border-box;
+  transform-origin:top left;
+}
+.card-head{border-bottom:2px solid #111; padding:8px 16px; text-align:center; position:relative}
+.card-head .cn{font-size:12px; letter-spacing:.3em}
+.card-head .en{font-family:var(--hand); font-size:24px; font-weight:700; letter-spacing:.03em; margin-top:1px}
+.card-head .sub{margin-top:4px; font-size:11px}
+.card-head .sub .cn2{display:inline-block; font-size:10px; color:#444; margin-left:8px}
+.card-datebox{position:absolute; top:8px; right:14px; border:1px solid #111; padding:2px 8px; font-size:9px; text-align:center; font-family:var(--hand)}
+.card-fields{display:flex; gap:0; border-bottom:2px solid #111; font-size:11px; font-family:var(--hand)}
+.card-fields div{flex:1; padding:5px 14px; border-right:1px solid #111}
+.card-fields div:last-child{border-right:0}
+.card-fields b{font-weight:700; margin-right:5px; font-family:'Noto Sans JP',serif}
+.card-fields .line{display:inline-block; border-bottom:1px solid #111; min-width:60px; height:12px}
+
+/* 日ごとの列を並べるグリッド。列数は日数に応じて自動で決まる */
+.week-grid{display:grid; gap:0; padding:0}
+.day-col{border-right:1px solid #111; border-bottom:1px solid #111; min-width:0}
+.day-col:last-child{border-right:0}
+.day-col-head{background:#eee; border-bottom:1px solid #111; padding:3px 6px; font-size:10.5px; font-weight:700; display:flex; justify-content:space-between; gap:6px}
+.day-col-head .lbl{font-family:var(--hand); font-size:13px}
+.dc-table{width:100%; border-collapse:collapse; font-size:9px}
+.dc-table th{border-bottom:1px solid #111; padding:2px 3px; font-weight:700; font-size:7.5px; font-family:var(--hand); background:#f4f4f2}
+.dc-table td{border-bottom:1px dotted #999; padding:2px 3px; vertical-align:top; line-height:1.25}
+.dc-table tr:last-child td{border-bottom:0}
+.dc-table td.no{width:14px; text-align:center; color:#666}
+.dc-table td.name{text-align:left}
+.dc-table td.name b{font-weight:700}
+.dc-table td.name small{display:block; color:#666; font-size:7.5px}
+.dc-table td.num{width:30px; text-align:right; font-variant-numeric:tabular-nums}
+.dc-table td.blank{width:34px; text-align:right; color:#333}
+.card-foot{padding:5px 14px; font-size:8.5px; color:#555; text-align:center; border-top:1px solid #111; font-family:var(--hand)}
+
+.foot{border-top:1px solid var(--rule);padding:20px 0 50px;font-size:11.5px;color:var(--muted);max-width:74ch}
+.foot b{color:var(--ink)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow" id="tapZone">設備 &times; 時間 &times; 手法 → ブロックの列 → 有効セット</div>
+    <h1 id="headline">設定を入れてください。</h1>
+    <p class="attrib" id="attrib"></p>
+    <p>1回のトレーニングを「ブロックの列」として組み立てます。セット数は入力ではなく、ブロックを時間予算に詰めた結果として出てきます。標準は設備から自動生成、それ以外は考案者が好んだ種目によるプリセットです。</p>
+  </header>
+
+  <div class="cols">
+    <aside class="panel">
+      <div class="step">
+        <div class="step-head"><span class="step-no">01</span><span class="step-title">トレーニング手法</span></div>
+        <div class="field"><select id="method"></select></div>
+        <div class="row" style="margin-top:10px"><div class="field hide" id="weekField">
+          <label>周期の何週目</label><select id="week"><option value="0">第1週</option><option value="1">第2週</option><option value="2">第3週</option></select>
+        </div></div>
+        <div class="mcard" id="methodCard"></div>
+        <button class="fixbtn hide" id="fixEquip">不足している設備をONにする</button>
+
+        <div class="philbox">
+          <h4>思想の座標</h4>
+          <div class="sub">点をクリックすると手法が切り替わります。</div>
+          <div class="axis" id="axis"></div>
+          <div class="pcard" id="philSel"></div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="step-no">02</span><span class="step-title">使える設備</span></div>
+        <p class="hint">今日行くジムに置いてあるものだけ。自重種目は常に使えます。</p>
+        <div class="chips" id="equip"></div>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="step-no">03</span><span class="step-title">時間とインターバル</span></div>
+        <div class="row">
+          <div class="field"><label>回数 / 週</label>
+            <select id="days"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></div>
+          <div class="field"><label>1回あたり 分</label>
+            <select id="mins"><option>30</option><option>45</option><option selected>60</option><option>75</option><option>90</option><option>120</option></select></div>
+        </div>
+        <div class="row" style="margin-top:10px"><div class="field"><label>セット間インターバル 秒</label>
+          <select id="rest"><option>20</option><option>30</option><option>45</option><option>60</option><option>75</option><option selected>90</option><option>120</option><option>150</option><option>180</option></select>
+        </div></div>
+        <label class="fitline" id="autoFitLabel"><input type="checkbox" id="autoFit" checked> 1回の時間に合わせてメニューを自動調整する</label>
+        <p class="hint" id="timeHint" style="margin-top:10px"></p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="step-no">04</span><span class="step-title">目指したい体型</span></div>
+        <div class="field"><select id="goal"></select></div>
+        <p class="hint" id="goalHint" style="margin-top:10px"></p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="step-no">05</span><span class="step-title">身体データ（目標スコア用）</span></div>
+        <p class="hint">性別・体重・身長からBMIを出し、それを基準に部位ごとの目安の目標スコアを計算します。トレーニング負荷スコアを使う手法（標準・プロプリセット）で表示されます。</p>
+        <div class="row">
+          <div class="field"><label>性別</label>
+            <select id="bSex"><option value="m">男性</option><option value="f">女性</option><option value="o">回答しない</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field"><label>体重 kg</label><input type="number" id="bWeight" min="30" max="200" step="0.5" placeholder="例：65"></div>
+          <div class="field"><label>身長 cm</label><input type="number" id="bHeight" min="120" max="220" step="0.5" placeholder="例：170"></div>
+        </div>
+        <p class="hint" id="bmiHint" style="margin-top:8px"></p>
+      </div>
+
+      <button class="reroll" id="reroll">種目を組み直す</button>
+      <p class="hint" id="rerollHint" style="margin-top:6px"></p>
+      <button class="resetsw hide" id="resetSwap">差し替え・スキップ・並び替えをすべて元に戻す</button>
+
+      <div class="step save-step">
+        <div class="step-head"><span class="step-no">06</span><span class="step-title">設定の保存</span></div>
+        <p class="hint">この端末のブラウザには自動で保存されます。<b>別の端末やブラウザに引き継ぐには、書き出したファイルを読み込んでください。</b></p>
+        <button class="savebtn" id="exportBtn">設定を書き出す（ファイル保存）</button>
+        <button class="savebtn outline" id="importBtn">設定を読み込む</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+        <p class="hint" id="saveHint" style="margin-top:8px"></p>
+      </div>
+    </aside>
+
+    <main class="results">
+      <section class="ledger">
+        <div class="ledger-head"><h2>週間 有効セット収支</h2><span class="unit" id="unitNote"></span></div>
+        <div id="railHost"></div>
+        <div class="legend" id="legend"></div>
+        <div class="verdict" id="verdict"></div>
+        <div class="conv" id="conv"></div>
+      </section>
+      <section class="menu" id="menu"></section>
+      <div class="pdf-export">
+        <button class="pdf-btn" id="pdfBtn">この週間メニューをPDF出力する</button>
+        <p class="hint">印刷ダイアログが開きます。送信先（プリンター）で「PDFに保存」を選ぶとファイルになります。<b>週間メニュー全体を横向き1枚に収め</b>、日数が多い場合は自動で文字を縮小します（極端に種目数が多いと、それでも収まりきらないことがあります）。</p>
+      </div>
+      <div class="foot" id="foot"></div>
+    </main>
+  </div>
+</div>
+
+<div class="modal" id="swapModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3 id="sTitle">種目を差し替える</h3><div class="sub" id="sSub">—</div></div>
+    <button class="x" id="sClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="swaphead" id="sHead"></div>
+    <div class="swaplist" id="sList"></div>
+  </div>
+</div></div>
+
+<div class="modal" id="modal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3 id="mTitle">—</h3><div class="sub" id="mSub">—</div></div>
+    <button class="x" id="mClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="frame" id="mFrame"></div>
+    <div class="frame-fallback" id="mFallback"></div>
+    <div class="marks" id="mMarks"></div>
+    <div id="mCues"></div>
+    <div class="kv" id="mKv"></div>
+    <div class="play-row" id="mPlayRow"><input type="text" id="mVid" placeholder="YouTubeの動画ID"><button id="mPlay">再生</button></div>
+  </div>
+</div></div>
+
+<div class="modal" id="editModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3 id="eTitle">セット・レップ・インターバルを編集</h3><div class="sub" id="eSub">—</div></div>
+    <button class="x" id="eClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="row">
+      <div class="field" id="eSetsField"><label>セット数</label><input type="number" id="eSets" min="1" max="20"></div>
+      <div class="field"><label>回数（レップ）</label><input type="text" id="eReps" placeholder="例：8–10"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>インターバル 秒</label><input type="number" id="eRest" min="0" max="600" step="5"></div>
+    </div>
+    <button class="fixbtn" id="eSave" style="margin-top:14px">保存する</button>
+    <button class="resetsw" id="eReset" style="margin-top:8px">この種目をプリセットの数値に戻す</button>
+  </div>
+</div></div>
+
+<div class="modal" id="addModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3>種目を追加</h3><div class="sub" id="aSub">—</div></div>
+    <button class="x" id="aClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="field" style="margin-bottom:14px"><label>部位</label><select id="aMuscle"></select></div>
+    <div class="swaplist" id="aList"></div>
+  </div>
+</div></div>
+
+<div id="printArea"></div>
+
+<script>
+/* ============================================================
+   1. ブロック型 — すべての手法はこの5型の組み合わせで表現する
+   ============================================================ */
+const BLOCK = {
+  straight: {ja:'ストレート',   eff:1.00, desc:'同じ重量で、休憩を挟んで規定セット数'},
+  round:    {ja:'ラウンド',     eff:0.85, desc:'複数種目を1セットずつ連続。1周＝1ラウンド'},
+  restpause:{ja:'レストポーズ', eff:2.60, desc:'限界→短い停止→再開を繰り返して1本'},
+  drop:     {ja:'ドロップ',     eff:1.90, desc:'限界後に重量を落として継続、休まず段階を下る'},
+  pair:     {ja:'ペア',         eff:0.95, desc:'2種目を交互に。ペアの後だけ休む'}
+};
+const FAILURE_BONUS = 1.5;
+/* 逆方向の補正：明示的に「限界まで追い込まない」ことを手法自体が定義している場合の割引。
+   8×8（Gironda）は本人が重量を6割に落とし、密度を優先すると明言している。
+   同じ1セットでも、限界近くまで追い込むセットと同じ価値では数えられない。 */
+const SUBMAX_DISCOUNT = 0.65;
+
+const MUSCLES = {
+  chest:{ja:'胸',color:'var(--m-chest)'}, back:{ja:'背中',color:'var(--m-back)'},
+  shoulder:{ja:'肩',color:'var(--m-shoulder)'}, arm:{ja:'腕',color:'var(--m-arm)'},
+  legs:{ja:'脚',color:'var(--m-legs)'}, glute:{ja:'臀部',color:'var(--m-glute)'}, core:{ja:'体幹',color:'var(--m-core)'}
+};
+const MORDER = ['chest','back','shoulder','arm','legs','glute','core'];
+
+/* ============================================================
+   2. 設備・種目
+   ============================================================ */
+const EQUIP = [
+  {id:'barbell',ja:'バーベル＋ラック'},{id:'ez',ja:'EZバー'},{id:'bench',ja:'フラットベンチ'},
+  {id:'incline',ja:'インクラインベンチ'},{id:'dumbbell',ja:'ダンベル'},{id:'cable',ja:'ケーブル'},
+  {id:'smith',ja:'スミスマシン'},{id:'latpull',ja:'ラットプルダウン'},{id:'rowmc',ja:'ローイングマシン'},
+  {id:'chestmc',ja:'チェストプレス'},{id:'shoulmc',ja:'ショルダープレス'},{id:'pecdeck',ja:'ペックデック'},
+  {id:'legpress',ja:'レッグプレス'},{id:'hack',ja:'ハックスクワット'},{id:'legext',ja:'レッグエクステンション'},
+  {id:'legcurl',ja:'レッグカール'},{id:'calf',ja:'カーフレイズ台'},{id:'preacher',ja:'プリーチャー台'},
+  {id:'tbar',ja:'Tバー／ランドマイン'},{id:'hipabd',ja:'アブダクションマシン'},{id:'hyper',ja:'バックエクステンション台'},{id:'pullup',ja:'懸垂バー'},{id:'dip',ja:'ディップスバー'},
+  {id:'abmc',ja:'アブドミナル'}
+];
+const DEFAULT_ON = ['barbell','ez','bench','incline','dumbbell','cable','smith','latpull','rowmc',
+                    'chestmc','shoulmc','pecdeck','legpress','legext','legcurl','calf','hipabd','hyper','pullup','dip'];
+
+/* c:コンパウンド str:ストレッチ種目 pmp:パンプ種目 sig:その手法の代名詞的種目 */
+const EX = [
+/* 胸 */
+ {id:'bp',ja:'ベンチプレス',m:'chest',c:1,req:[['barbell'],['bench']],start:96},
+ {id:'inc_bb',ja:'インクラインバーベルプレス',m:'chest',c:1,req:[['barbell'],['incline']],start:88},
+ {id:'smith_inc',ja:'スミス・インクラインプレス',m:'chest',c:1,req:[['smith'],['incline']],start:70},
+ {id:'neck_press',ja:'ネックプレス（首元へ下ろす）',m:'chest',c:1,req:[['barbell'],['bench']],start:64},
+ {id:'db_press',ja:'ダンベルプレス',m:'chest',c:1,req:[['dumbbell'],['bench']],start:52},
+ {id:'idp',ja:'インクラインダンベルプレス',m:'chest',c:1,req:[['dumbbell'],['incline']],start:145},
+ {id:'cpmc',ja:'チェストプレス（マシン）',m:'chest',c:1,req:[['chestmc']],start:52},
+ {id:'dipx',ja:'ディップス',m:'chest',c:1,req:[['dip']],start:38},
+ {id:'gironda_dip',ja:'ジロンダディップス（V字バー・顎を胸に）',m:'chest',c:1,req:[['dip']],start:46},
+ {id:'fly',ja:'ダンベルフライ',m:'chest',c:0,str:1,req:[['dumbbell'],['bench']],start:112},
+ {id:'peck',ja:'ペックデックフライ',m:'chest',c:0,pmp:1,req:[['pecdeck']],start:41},
+ {id:'cross',ja:'ケーブルクロスオーバー',m:'chest',c:0,pmp:1,req:[['cable']],start:88},
+ {id:'low_cross',ja:'ローケーブルクロスオーバー',m:'chest',c:0,pmp:1,req:[['cable']],start:75},
+ {id:'inc_cable_fly',ja:'インクラインケーブルフライ',m:'chest',c:0,pmp:1,req:[['cable'],['incline']],start:60},
+ {id:'pu',ja:'腕立て伏せ',m:'chest',c:1,req:[],start:24},
+/* 背中 */
+ {id:'dl',ja:'デッドリフト',m:'back',c:1,req:[['barbell']],start:210},
+ {id:'rack_dl',ja:'ラックデッドリフト',m:'back',c:1,req:[['barbell']],start:190},
+ {id:'row',ja:'ベントオーバーロウ',m:'back',c:1,req:[['barbell']],start:130},
+ {id:'yates_row',ja:'ヤーツロウ（アンダーグリップ）',m:'back',c:1,req:[['barbell']],start:118},
+ {id:'tbar_row',ja:'Tバーロウ',m:'back',c:1,req:[['tbar']],start:96},
+ {id:'meadows_row',ja:'メドウズロウ',m:'back',c:1,req:[['tbar']],start:104},
+ {id:'lat',ja:'ラットプルダウン',m:'back',c:1,req:[['latpull']],start:64},
+ {id:'wide_pulldown',ja:'ワイドプルダウン（胸に引く）',m:'back',c:1,req:[['latpull']],start:72},
+ {id:'chin',ja:'懸垂',m:'back',c:1,req:[['pullup']],start:45},
+ {id:'chin_under',ja:'アンダーグリップ懸垂',m:'back',c:1,req:[['pullup']],start:50},
+ {id:'srow',ja:'シーテッドロー',m:'back',c:1,req:[['rowmc','cable']],start:57},
+ {id:'csrow',ja:'チェストサポーテッドロウ',m:'back',c:1,req:[['rowmc']],start:63},
+ {id:'1drow',ja:'ワンハンドダンベルロウ',m:'back',c:1,req:[['dumbbell'],['bench']],start:120},
+ {id:'cpo',ja:'ケーブルプルオーバー',m:'back',c:0,str:1,req:[['cable']],start:95},
+ {id:'sarm',ja:'ストレートアームプルダウン',m:'back',c:0,pmp:1,req:[['cable']],start:80},
+/* 肩 */
+ {id:'ohp',ja:'オーバーヘッドプレス',m:'shoulder',c:1,req:[['barbell']],start:150},
+ {id:'btn_press',ja:'ビハインドネックプレス',m:'shoulder',c:1,req:[['barbell']],start:132},
+ {id:'smith_shp',ja:'スミス・ショルダープレス',m:'shoulder',c:1,req:[['smith']],start:58},
+ {id:'dshp',ja:'ダンベルショルダープレス',m:'shoulder',c:1,req:[['dumbbell']],start:78},
+ {id:'shmc',ja:'ショルダープレス（マシン）',m:'shoulder',c:1,req:[['shoulmc']],start:41},
+ {id:'side',ja:'サイドレイズ',m:'shoulder',c:0,pmp:1,req:[['dumbbell']],start:105},
+ {id:'clr',ja:'ケーブルサイドレイズ',m:'shoulder',c:0,pmp:1,req:[['cable']],start:82},
+ {id:'front_lat',ja:'フロントレイズ',m:'shoulder',c:0,pmp:1,req:[['dumbbell']],start:70},
+ {id:'rear',ja:'リアデルトフライ（ダンベル）',m:'shoulder',c:0,str:1,req:[['dumbbell']],start:134},
+ {id:'rear_pec',ja:'リアデルト（ペックデック）',m:'shoulder',c:0,str:1,req:[['pecdeck']],start:52},
+ {id:'upright',ja:'アップライトロウ',m:'shoulder',c:1,req:[['barbell']],start:64},
+ {id:'shrug',ja:'シュラッグ',m:'shoulder',c:0,req:[['dumbbell']],start:44},
+/* 腕 */
+ {id:'bcurl',ja:'バーベルカール',m:'arm',c:0,req:[['barbell']],start:60},
+ {id:'ez_curl',ja:'EZバーカール',m:'arm',c:0,req:[['ez']],start:56},
+ {id:'drag_curl',ja:'ドラッグカール',m:'arm',c:0,req:[['barbell']],start:68},
+ {id:'preacher_curl',ja:'プリーチャーカール',m:'arm',c:0,str:1,req:[['preacher'],['ez','barbell']],start:74},
+ {id:'dcurl',ja:'ダンベルカール',m:'arm',c:0,req:[['dumbbell']],start:47},
+ {id:'inc_c',ja:'インクラインダンベルカール',m:'arm',c:0,str:1,req:[['dumbbell'],['incline']],start:66},
+ {id:'conc_curl',ja:'コンセントレーションカール',m:'arm',c:0,pmp:1,req:[['dumbbell']],start:90},
+ {id:'ccurl',ja:'ケーブルカール',m:'arm',c:0,pmp:1,req:[['cable']],start:73},
+ {id:'nbp',ja:'ナローベンチプレス',m:'arm',c:1,req:[['barbell'],['bench']],start:118},
+ {id:'skull',ja:'スカルクラッシャー',m:'arm',c:0,str:1,req:[['ez'],['bench']],start:82},
+ {id:'pdown',ja:'プッシュダウン',m:'arm',c:0,pmp:1,req:[['cable']],start:36},
+ {id:'ohext',ja:'オーバーヘッドエクステンション',m:'arm',c:0,str:1,req:[['dumbbell']],start:90},
+ {id:'dip_tri',ja:'ディップス（三頭）',m:'arm',c:1,req:[['dip']],start:42},
+/* 脚 */
+ {id:'sq',ja:'バーベルスクワット',m:'legs',c:1,req:[['barbell']],start:175},
+ {id:'front_sq',ja:'フロントスクワット',m:'legs',c:1,req:[['barbell']],start:150},
+ {id:'hack_sq',ja:'ハックスクワット',m:'legs',c:1,req:[['hack']],start:78},
+ {id:'sissy',ja:'シシースクワット',m:'legs',c:0,str:1,req:[],start:40},
+ {id:'lp',ja:'レッグプレス',m:'legs',c:1,req:[['legpress']],start:44},
+ {id:'rdl',ja:'ルーマニアンデッドリフト',m:'legs',c:1,str:1,req:[['barbell']],start:160},
+ {id:'sldl',ja:'スティッフレッグデッドリフト',m:'legs',c:1,str:1,req:[['barbell']],start:154},
+ {id:'bsq',ja:'ブルガリアンスクワット',m:'legs',c:1,req:[['dumbbell'],['bench']],start:126},
+ {id:'lunge',ja:'ウォーキングランジ',m:'legs',c:1,req:[['dumbbell']],start:98},
+ {id:'lext',ja:'レッグエクステンション',m:'legs',c:0,pmp:1,req:[['legext']],start:33},
+ {id:'lcurl',ja:'ライイングレッグカール',m:'legs',c:0,req:[['legcurl']],start:29},
+ {id:'calf_raise',ja:'カーフレイズ',m:'legs',c:0,req:[['calf']],start:26},
+ {id:'bwsq',ja:'自重スクワット',m:'legs',c:1,req:[],start:20},
+/* 臀部 */
+ {id:'hip_thrust',ja:'バーベルヒップスラスト',m:'glute',c:1,req:[['barbell'],['bench']],start:88},
+ {id:'db_hipthrust',ja:'ダンベルヒップスラスト',m:'glute',c:1,req:[['dumbbell'],['bench']],start:74},
+ {id:'gbridge',ja:'グルートブリッジ',m:'glute',c:0,req:[],start:36},
+ {id:'sumo_dl',ja:'スモウデッドリフト',m:'glute',c:1,req:[['barbell']],start:120},
+ {id:'rdl_g',ja:'ルーマニアンデッドリフト（臀部狙い）',m:'glute',c:1,str:1,req:[['barbell','dumbbell']],start:160},
+ {id:'bsq_g',ja:'ブルガリアンスクワット（前傾フォーム）',m:'glute',c:1,req:[['dumbbell'],['bench']],start:126},
+ {id:'sumo_sq',ja:'ワイドスタンス・スクワット',m:'glute',c:1,req:[['barbell','dumbbell']],start:150},
+ {id:'step_up',ja:'ステップアップ',m:'glute',c:1,req:[['dumbbell'],['bench']],start:70},
+ {id:'lp_high',ja:'レッグプレス（足を高く置く）',m:'glute',c:1,req:[['legpress']],start:48},
+ {id:'pull_through',ja:'ケーブルプルスルー',m:'glute',c:1,str:1,req:[['cable']],start:60},
+ {id:'hyper_g',ja:'バックエクステンション（臀部狙い）',m:'glute',c:0,str:1,req:[['hyper']],start:44},
+ {id:'cable_kick',ja:'ケーブルキックバック',m:'glute',c:0,pmp:1,req:[['cable']],start:52},
+ {id:'abduction',ja:'ヒップアブダクション',m:'glute',c:0,pmp:1,req:[['hipabd']],start:28},
+ {id:'band_abd',ja:'サイドライイング・アブダクション（自重）',m:'glute',c:0,pmp:1,req:[],start:24},
+ {id:'frog',ja:'フロッグポンプ',m:'glute',c:0,pmp:1,req:[],start:20},
+/* 体幹 */
+ {id:'ccr',ja:'ケーブルクランチ',m:'core',c:0,req:[['cable']],start:55},
+ {id:'hlr',ja:'ハンギングレッグレイズ',m:'core',c:0,req:[['pullup']],start:68},
+ {id:'abmcx',ja:'アブドミナルクランチ',m:'core',c:0,req:[['abmc']],start:27},
+ {id:'plank',ja:'プランク',m:'core',c:0,req:[],start:15},
+ {id:'crun',ja:'クランチ',m:'core',c:0,req:[],start:22}
+];
+const EXBY = {}; EX.forEach(e=>EXBY[e.id]=e);
+const EQBY = {}; EQUIP.forEach(e=>EQBY[e.id]=e.ja);
+
+/* 大分類（胸・背中など）だけでは分からない、狙いの部位。一般的な運動生理学の知見に基づく目安で、
+   個人差・フォームにより実際に効く部位は変わります。 */
+const DETAIL = {
+  bp:'大胸筋中部',inc_bb:'大胸筋上部',smith_inc:'大胸筋上部',neck_press:'大胸筋上部',db_press:'大胸筋中部',
+  idp:'大胸筋上部',cpmc:'大胸筋中部',dipx:'大胸筋下部',gironda_dip:'大胸筋下部',fly:'大胸筋中部（ストレッチ）',
+  peck:'大胸筋内側',cross:'大胸筋内側・下部',low_cross:'大胸筋下部',inc_cable_fly:'大胸筋上部',pu:'大胸筋中部',
+  dl:'脊柱起立筋・広背筋・大臀筋',rack_dl:'脊柱起立筋・僧帽筋',row:'広背筋中部・僧帽筋',yates_row:'広背筋中部',
+  tbar_row:'広背筋中部・僧帽筋',meadows_row:'広背筋下部・外側',lat:'広背筋',wide_pulldown:'広背筋上部・外側',
+  chin:'広背筋・上腕二頭筋',chin_under:'広背筋下部・上腕二頭筋',srow:'広背筋中部・僧帽筋中部',csrow:'広背筋中部',
+  '1drow':'広背筋',cpo:'広背筋（ストレッチ）',sarm:'広背筋下部',
+  ohp:'三角筋前部',btn_press:'三角筋中部',smith_shp:'三角筋前部',dshp:'三角筋前部',shmc:'三角筋前部',
+  side:'三角筋中部',clr:'三角筋中部',front_lat:'三角筋前部',rear:'三角筋後部',rear_pec:'三角筋後部',
+  upright:'三角筋中部・僧帽筋',shrug:'僧帽筋上部',
+  bcurl:'上腕二頭筋（外側頭）',ez_curl:'上腕二頭筋',drag_curl:'上腕二頭筋（内側頭）',preacher_curl:'上腕二頭筋（下部）',
+  dcurl:'上腕二頭筋',inc_c:'上腕二頭筋（長頭・ストレッチ）',conc_curl:'上腕二頭筋（収縮）',ccurl:'上腕二頭筋',
+  nbp:'上腕三頭筋（外側頭）',skull:'上腕三頭筋（長頭）',pdown:'上腕三頭筋（外側頭）',ohext:'上腕三頭筋（長頭）',dip_tri:'上腕三頭筋',
+  sq:'大腿四頭筋・大臀筋',front_sq:'大腿四頭筋',hack_sq:'大腿四頭筋',sissy:'大腿四頭筋（下部）',lp:'大腿四頭筋',
+  rdl:'ハムストリング・大臀筋',sldl:'ハムストリング',bsq:'大腿四頭筋・大臀筋',lunge:'大腿四頭筋・大臀筋',
+  lext:'大腿四頭筋',lcurl:'ハムストリング',calf_raise:'下腿三頭筋（カーフ）',bwsq:'大腿四頭筋',
+  hip_thrust:'大臀筋',db_hipthrust:'大臀筋',gbridge:'大臀筋',sumo_dl:'大臀筋・ハムストリング',rdl_g:'大臀筋・ハムストリング',
+  bsq_g:'大臀筋',sumo_sq:'大臀筋・内転筋',step_up:'大臀筋・大腿四頭筋',lp_high:'大臀筋・ハムストリング',
+  pull_through:'大臀筋（ストレッチ）',hyper_g:'大臀筋・脊柱起立筋',cable_kick:'大臀筋（収縮）',
+  abduction:'中臀筋',band_abd:'中臀筋',frog:'中臀筋・大臀筋',
+  ccr:'腹直筋',hlr:'腹直筋下部',abmcx:'腹直筋',plank:'腹直筋・体幹安定',crun:'腹直筋'
+};
+EX.forEach(e=> e.detail = DETAIL[e.id] || '');
+
+/* 重量(kg)欄の意味づけ。同じ「kg」でも種目によって指すものが違うため、明示的に分ける。
+   pair   ：ダンベルを両手に1個ずつ持つ種目。入力は片手分の重量で、実際の負荷は計算上2倍する
+            （「20kgのダンベルでフライ」と言うときの「20kg」は片方の重さを指すのが通例のため）。
+   single ：片手・片足だけで扱う種目や、ダンベル1個を両手で持つ種目、バーベル・マシン・ケーブル種目。
+            入力がそのまま負荷（バーベルなら総重量、マシンならスタック値）。
+   bw     ：自重が主体の種目。入力欄は「加重」として扱い、未入力なら自重のみ＝回数だけの目安にする。 */
+const LOADUNIT = {
+  // pair：両手に1個ずつダンベル
+  db_press:'pair', idp:'pair', fly:'pair', dshp:'pair', side:'pair', front_lat:'pair', rear:'pair',
+  dcurl:'pair', inc_c:'pair', bsq:'pair', bsq_g:'pair', lunge:'pair', step_up:'pair', shrug:'pair',
+  // single：片手・片足だけ動かす、またはダンベル1個を両手で持つ
+  '1drow':'single', conc_curl:'single', ohext:'single', db_hipthrust:'single', sumo_sq:'single', rdl_g:'single',
+  // bw：自重が主体（バー・ディップス台などの器具を使う自重種目も含む）
+  pu:'bw', sissy:'bw', bwsq:'bw', gbridge:'bw', band_abd:'bw', frog:'bw', plank:'bw', crun:'bw',
+  dipx:'bw', gironda_dip:'bw', chin:'bw', chin_under:'bw', dip_tri:'bw', hlr:'bw'
+};
+EX.forEach(e=> e.loadUnit = LOADUNIT[e.id] || 'single');
+
+/* 解説動画。種目IDをキーに、その種目のフォーム／テクニックを解説している動画を紐づける。
+   URLをそのまま持たず、動画ID(11桁)と秒数(整数)だけを持って組み立てる。
+   長いURLは真偽の検証ができないが、IDと整数なら人間が確認できるため。
+   marks は動画内の章。cues／ng は「動画内で実際に述べられている内容」に限り、
+   一般論による補完はしない。補完したくなった箇所は書かずに省く。 */
+const CLIP = {
+  lcurl: [{
+    vid:'mJyvE7ZjtrU',
+    title:'Grow massive hamstrings doing this',
+    by:'mountaindog1（John Meadows）',
+    lead:'レッグカールで効果が出ないのは種目のせいではなく、強度が足りていないから。可動域・重量・降ろす局面の3方向から限界の先へ伸ばす。',
+    marks:[
+      {t:0,   ja:'導入：ハムストリングの考え方'},
+      {t:43,  ja:'① パーシャル・レップス'},
+      {t:127, ja:'② ドロップセット'},
+      {t:196, ja:'③ エキセントリック・ローディング'},
+      {t:302, ja:'応用：組み合わせる'}
+    ],
+    cues:[
+      '全レップで限界まで強く収縮（スクイーズ）させる',
+      'フルレンジ8回 → 挙がらなくなったら可動域を半分にして8〜10回',
+      'ドロップは休憩を挟まず、即座に軽くして連続で6回',
+      '最終セットはドロップを4〜5段まで落としてよい',
+      'エキセントリックは挙上を自力、降ろす局面だけ補助者が上から押す'
+    ],
+    ng:[
+      '補助者が最下点まで押し込む（筋断裂の恐れ。4分の3で手を離し、最後は自力で降ろす）',
+      'パーシャル／エキセントリックを毎セット行う（どちらも1セットのみに限定する）'
+    ]
+  }]
+};
+
+const GOALS = [
+  {id:'v',ja:'逆三角形（肩と背中を広く）',hint:'背中と肩に要求量を寄せています。',
+   need:{chest:10,back:16,shoulder:14,arm:8,legs:8,glute:4,core:4}},
+  {id:'bal',ja:'全身バランス肥大',hint:'全部位を均等に。',
+   need:{chest:12,back:12,shoulder:10,arm:10,legs:12,glute:8,core:6}},
+  {id:'slim',ja:'細マッチョ（絞って輪郭を出す）',hint:'要求量は最小。体脂肪を落とすのは食事側の仕事で、この計算の外です。',
+   need:{chest:8,back:8,shoulder:8,arm:6,legs:8,glute:8,core:6}},
+  {id:'ath',ja:'下半身重視・アスリート型',hint:'脚と臀部に大きく配分します。',
+   need:{chest:8,back:12,shoulder:8,arm:4,legs:14,glute:12,core:8}},
+  {id:'str',ja:'筋力優先（重量を伸ばす）',hint:'コンパウンド中心。長いインターバルが前提です。',
+   need:{chest:10,back:10,shoulder:6,arm:4,legs:12,glute:8,core:6}},
+  {id:'pro',ja:'全身の筋力・筋量向上（プロ仕様）',hint:'プロのプリセットはこの目標に固定されます。全部位を高い水準まで引き上げる前提です。',
+   need:{chest:14,back:16,shoulder:12,arm:12,legs:14,glute:6,core:6}},
+  {id:'glutefocus',ja:'お尻重点（ヒップアップ）',hint:'臀部に要求量を大きく寄せ、上半身は姿勢を保つ最小限にしています。',
+   need:{chest:4,back:8,shoulder:6,arm:4,legs:10,glute:20,core:8}}
+];
+
+/* ============================================================
+   3. 手法定義
+   標準のみアルゴリズム生成（plan）。それ以外は考案者の定番種目によるプリセット。
+   ============================================================ */
+const S  = (ex,sets,reps,o={}) => Object.assign({type:'straight',ex,sets,reps},o);
+const RP = (ex,reps,o={})      => Object.assign({type:'restpause',ex,reps,minis:3,pause:18},o);
+const DR = (ex,reps,o={})      => Object.assign({type:'drop',ex,reps,stages:3},o);
+const RD = (exs,reps,rounds,o={}) => Object.assign({type:'round',exs,reps,rounds,restIn:10},o);
+const PR = (exs,sets,reps,o={})   => Object.assign({type:'pair',exs,sets,reps,restIn:0},o);
+const F  = {toFailure:1};
+
+const METHODS = [
+ {id:'std',ja:'標準（ストレートセット）',short:'標準',by:'—',workSec:40,rest:null,axis:1.00,
+  core:'同じ重量で複数セット。すべての基準になる組み方。',
+  sig:'設備と時間から自動生成します。プリセットではありません。',
+  plan:{unit:{type:'straight',sets:3},maxBlocks:3}},
+
+ {id:'hd',ja:'Heavy Duty',short:'Heavy Duty',by:'Mike Mentzer',filler:{type:'straight',sets:1,reps:'6–10 限界まで',toFailure:1},
+  goal:'pro',pro:1,
+  sched:{cycleDays:8,note:'4種類を中1日ずつ回し、8日で1周。Mentzerは後年さらに間隔を空けています'},
+  workSec:55,rest:180,axis:0.30,disputes:1,
+  core:'ウォームアップ後の本番は1セットのみ。限界まで追い込み、頻度とボリュームを極端に削る。',
+  sig:'先行疲労（マシンのアイソレーション→コンパウンド）とNautilus系マシンを多用。ペックデック、プルオーバー、レッグエクステンションが定番。',
+  note:'4日で1周し、各回の間に中2〜4日空けるのが本来の形です。表には本番セットのみ出しているため、この前にウォームアップが必要です。',
+  preset:{days:[
+    {ja:'胸・背中',blocks:[
+      S('peck',1,'6–10 限界まで',{...F,role:'先行疲労',sigmark:1}),
+      S('inc_bb',1,'6–10 限界まで',F),
+      S('cpo',1,'6–10 限界まで',{...F,role:'先行疲労',sigmark:1}),
+      S('chin_under',1,'6–10 限界まで',{...F,sigmark:1}),
+      S('dl',1,'6–10 限界まで',F)]},
+    {ja:'脚',blocks:[
+      S('lext',1,'8–12 限界まで',{...F,role:'先行疲労',sigmark:1}),
+      S('lp',1,'8–12 限界まで',F),
+      S('hip_thrust',1,'8–12 限界まで',F),
+      S('calf_raise',1,'12–15 限界まで',F)]},
+    {ja:'肩・腕',blocks:[
+      S('side',1,'6–10 限界まで',F),
+      S('rear_pec',1,'6–10 限界まで',F),
+      S('bcurl',1,'6–10 限界まで',F),
+      S('pdown',1,'6–10 限界まで',{...F,role:'先行疲労'}),
+      S('dip_tri',1,'6–10 限界まで',F),
+      S('hlr',1,'限界まで',F)]},
+    {ja:'脚（2巡目）',blocks:[
+      S('sq',1,'8–12 限界まで',F),
+      S('calf_raise',1,'12–15 限界まで',F)]}
+  ]}},
+
+ {id:'bg',ja:'Blood & Guts',short:'Blood&Guts',by:'Dorian Yates',filler:{type:'straight',sets:1,reps:'6–10 限界まで',toFailure:1},
+  goal:'pro',pro:1,
+  sched:{cycleDays:7,note:'4種類を1週間で1周（3日連続→休み→2日→休み）'},
+  workSec:50,rest:150,axis:0.45,disputes:1,
+  core:'本番1セットを限界まで。最後の種目はドロップで押し切る。',
+  sig:'スミスマシンでの各種プレス、アンダーグリップのベントオーバーロウ（通称ヤーツロウ）、マシンプルオーバーが代名詞。',
+  note:'フォーストレップには補助者が必要です。表には本番セットのみ出しています。',
+  preset:{days:[
+    {ja:'胸・二頭',blocks:[
+      S('smith_inc',1,'6–8 限界まで',{...F,sigmark:1}),
+      S('db_press',1,'6–8 限界まで',F),
+      S('inc_cable_fly',1,'8–10 限界まで',F),
+      S('ez_curl',1,'6–8 限界まで',F),
+      DR('inc_c','8–10 → 落として継続',F)]},
+    {ja:'脚',blocks:[
+      S('lext',1,'10–12',{role:'先行疲労'}),
+      S('lp',1,'10–12 限界まで',F),
+      S('hack_sq',1,'8–10 限界まで',F),
+      S('hip_thrust',1,'8–10 限界まで',F),
+      S('lcurl',1,'8–10 限界まで',F),
+      S('sldl',1,'8–10',{})]},
+    {ja:'背中・リアデルト',blocks:[
+      S('cpo',1,'8–10',{role:'先行疲労',sigmark:1}),
+      S('lat',1,'8–10 限界まで',F),
+      S('yates_row',1,'6–8 限界まで',{...F,sigmark:1}),
+      S('srow',1,'8–10 限界まで',F),
+      S('rear_pec',1,'8–10',{}),
+      S('dl',1,'6–8',{}),
+      S('hlr',1,'限界まで',F)]},
+    {ja:'肩・三頭',blocks:[
+      S('smith_shp',1,'6–8 限界まで',{...F,sigmark:1}),
+      S('side',1,'8–10 限界まで',F),
+      DR('clr','10–12 → 落として継続',{}),
+      S('pdown',1,'8–10',{}),
+      S('skull',1,'6–8 限界まで',F),
+      S('dip_tri',1,'8–10 限界まで',F)]}
+  ]}},
+
+ {id:'dc',ja:'DC Training',short:'DC',by:'Dante Trudel',filler:{type:'restpause',reps:'8–12 / 4–6 / 3–5',minis:3,pause:18},
+  goal:'pro',pro:1,
+  sched:{spw:3,note:'2種類をA→B→Aと交互に、週3回。翌週はB→A→B。1つのワークアウトは週1.5回の計算になります'},
+  workSec:35,rest:120,axis:0.40,disputes:1,
+  core:'レストポーズ。限界→10〜20秒停止→再開を3回で1本。',
+  sig:'スミスマシンでのプレス、ラックデッドリフト、ハックスクワット。仕上げに20レップの「ワイドウメーカー」。各部位の後に極端なストレッチ。',
+  note:'A/Bを交互に、週3回で回します（A→B→A、翌週はB→A→B）。種目は毎回ローテーションさせ、記録が更新できなければ次回は種目を替える、というのが本来の運用です。',
+  preset:{days:[
+    {ja:'ワークアウトA（胸・肩・三頭・背中）',blocks:[
+      RP('smith_inc','8–12 / 4–6 / 3–5',{sigmark:1}),
+      RP('smith_shp','8–12 / 4–6 / 3–5'),
+      RP('dip_tri','8–12 / 4–6 / 3–5'),
+      RP('wide_pulldown','8–12 / 4–6 / 3–5'),
+      S('rack_dl',1,'6–9',{role:'厚み・レストポーズは使わない',sigmark:1}),
+      RP('hlr','限界まで')]},
+    {ja:'ワークアウトB（二頭・カーフ・ハム・大腿四頭）',blocks:[
+      RP('preacher_curl','8–12 / 4–6 / 3–5'),
+      S('calf_raise',1,'10–12',{role:'底で10–15秒静止'}),
+      S('sldl',1,'8–10',{}),
+      RP('hack_sq','8–12 / 4–6 / 3–5',{sigmark:1}),
+      RP('hip_thrust','8–12 / 4–6 / 3–5'),
+      S('lp',1,'20 ワイドウメーカー',{...F,role:'仕上げ',sigmark:1})]}
+  ]}},
+
+ {id:'fst7',ja:'FST-7',short:'FST-7',by:'Hany Rambod',goal:'pro',pro:1,
+  sched:{cycleDays:7,note:'4種類を1週間で1周'},
+  workSec:32,rest:null,axis:1.05,
+  core:'通常のストレートで土台を作り、仕上げにアイソレーション種目で7セット（休憩30〜45秒）。',
+  sig:'仕上げの7セットは、ペックデック、ケーブルサイドレイズ、レッグエクステンションなど、可動域を保ったまま追い込めるマシン・ケーブル種目で行うのが定番。',
+  preset:{days:[
+    {ja:'胸',blocks:[
+      S('inc_bb',4,'8–10'),S('db_press',3,'10–12'),S('cpmc',3,'10–12'),
+      S('peck',7,'10–12',{rest:38,tag:'FST-7',sigmark:1})]},
+    {ja:'背中',blocks:[
+      S('lat',4,'10–12'),S('row',4,'8–10'),S('srow',3,'10–12'),
+      S('sarm',7,'12–15',{rest:38,tag:'FST-7',sigmark:1})]},
+    {ja:'脚',blocks:[
+      S('lext',4,'12–15',{role:'先行疲労'}),S('sq',4,'8–10'),S('lp',3,'12–15'),S('lcurl',3,'10–12'),
+      S('hip_thrust',3,'10–12'),
+      S('lext',7,'12–15',{rest:38,tag:'FST-7',sigmark:1})]},
+    {ja:'肩・腕',blocks:[
+      S('dshp',4,'10–12'),S('side',4,'12–15'),
+      S('clr',7,'12–15',{rest:38,tag:'FST-7',sigmark:1}),
+      S('ez_curl',3,'10–12'),S('pdown',3,'12–15'),
+      S('ccurl',7,'12',{rest:38,tag:'FST-7',sigmark:1}),
+      S('ccr',3,'15–20')]}
+  ]}},
+
+ {id:'gvt',ja:'German Volume Training 10×10',short:'GVT',by:'Charles Poliquin ら',filler:{type:'straight',sets:3,reps:'10–12'},
+  goal:'pro',pro:1,
+  sched:{cycleDays:5,note:'3種類を5日周期で回す（トレ→トレ→休→トレ→休）'},
+  workSec:32,rest:75,axis:1.25,
+  core:'主種目を同じ重量で10セット×10回。拮抗する2種目を交互に組むのが定番。',
+  sig:'胸と背中、四頭とハムのように拮抗筋をペアにして10×10。開始重量は1RMの約60%。',
+  note:'開始重量は1RMの約60%で、限界までは追い込みません。最後のセットまで10回できてしまうなら軽すぎます。オフシーズンの短期集中用で、通年で回す手法ではありません。',
+  preset:{days:[
+    {ja:'胸・背中',blocks:[
+      S('db_press',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('row',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('inc_cable_fly',3,'10–12'),S('1drow',3,'10–12')]},
+    {ja:'脚・体幹',blocks:[
+      S('sq',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('lcurl',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('calf_raise',3,'15'),S('ccr',3,'15'),S('hip_thrust',3,'12–15')]},
+    {ja:'肩・腕',blocks:[
+      S('nbp',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('ez_curl',10,'10',{tag:'10×10',sigmark:1,submax:1}),
+      S('side',3,'12'),S('rear',3,'12')]}
+  ]}},
+
+ {id:'g8x8',ja:'8×8',short:'8×8',by:'Vince Gironda',filler:{type:'straight',sets:8,reps:'8',submax:1},
+  goal:'pro',pro:1,
+  sched:{cycleDays:4,note:'3種類を3日連続＋1日休みで回す'},
+  workSec:25,rest:20,axis:1.30,
+  core:'主種目だけを8回×8セット、極端に短い休憩で。重量ではなく密度を上げる。',
+  sig:'バックスクワットとフラットベンチを嫌い、ネックプレス、V字バーのジロンダディップス、ドラッグカール、シシースクワット、フロントスクワットを好んだ。',
+  note:'普段の6割程度の重量で、限界までは追い込みません。8×8は主種目1つに絞るのが本来の形で、複数種目を8×8で重ねるものではありません。休憩20秒を守れないなら重すぎます。',
+  preset:{days:[
+    {ja:'胸・背中',blocks:[
+      S('neck_press',8,'8',{sigmark:1,submax:1}),
+      S('gironda_dip',3,'10–12'),
+      S('wide_pulldown',8,'8',{sigmark:1,submax:1}),
+      S('srow',3,'10–12')]},
+    {ja:'肩・腕',blocks:[
+      S('side',8,'8',{sigmark:1,submax:1}),
+      S('front_lat',3,'10–12'),
+      S('drag_curl',8,'8',{sigmark:1,submax:1}),
+      S('pdown',3,'10–12')]},
+    {ja:'脚',blocks:[
+      S('front_sq',8,'8',{sigmark:1,submax:1}),
+      S('sissy',3,'12–15',{sigmark:1}),
+      S('calf_raise',3,'12–15'),
+      S('step_up',3,'10–12'),
+      S('crun',3,'15–20')]}
+  ]}},
+
+ {id:'mdog',ja:'Mountain Dog',short:'Mountain Dog',by:'John Meadows',goal:'pro',pro:1,
+  sched:{cycleDays:5,note:'3種類を5日周期で回す'},
+  workSec:38,rest:null,axis:1.05,
+  core:'先行疲労 → コンパウンド → ストレッチ → 仕上げのドロップ、と刺激の質を変えて並べる。',
+  sig:'ランドマインを使った片手ロウ（通称メドウズロウ）が代名詞。関節を痛めない配列と、種目ごとの役割分担を重視。',
+  preset:{days:[
+    {ja:'胸・三頭',blocks:[
+      S('cross',3,'15',{role:'先行疲労'}),S('inc_bb',4,'8',{role:'コンパウンド'}),
+      S('db_press',3,'10',{role:'コンパウンド'}),S('fly',3,'12',{role:'ストレッチ'}),
+      DR('pdown','12–15 → 落として継続',{role:'仕上げ'})]},
+    {ja:'背中・二頭',blocks:[
+      S('sarm',3,'15',{role:'先行疲労'}),S('meadows_row',4,'8',{role:'コンパウンド',sigmark:1}),
+      S('csrow',3,'10',{role:'コンパウンド'}),S('cpo',3,'12',{role:'ストレッチ'}),
+      DR('ez_curl','10–12 → 落として継続',{role:'仕上げ'})]},
+    {ja:'脚・肩',blocks:[
+      S('lext',3,'15',{role:'先行疲労'}),S('hack_sq',4,'8',{role:'コンパウンド'}),
+      S('lunge',3,'12',{role:'コンパウンド'}),S('lcurl',3,'12',{role:'ストレッチ'}),
+      S('hip_thrust',3,'10–12',{role:'臀部'}),
+      DR('clr','15–20 → 落として継続',{role:'仕上げ'}),
+      S('hlr',3,'限界まで',{role:'体幹'})]}
+  ]}},
+
+ {id:'phul',ja:'P.H.U.L.',short:'PHUL',by:'Layne Norton',goal:'pro',pro:1,
+  sched:{cycleDays:7,note:'4種類を1週間で1周'},
+  workSec:45,rest:null,axis:1.00,
+  core:'上下分割を、筋力の日と筋肥大の日に分ける。週4回が前提。',
+  sig:'パワー日はビッグリフトを3–5レップ、ハイパートロフィー日はダンベル・ケーブル種目を8–15レップ。査読論文を根拠に組まれた構成。',
+  preset:{days:[
+    {ja:'上半身・パワー',blocks:[
+      S('bp',3,'3–5'),S('row',3,'3–5'),S('ohp',3,'5–8'),S('lat',3,'6–10'),
+      S('ez_curl',3,'6–10'),S('skull',3,'6–10')]},
+    {ja:'下半身・パワー',blocks:[
+      S('sq',3,'3–5'),S('dl',3,'3–5'),S('lp',3,'10–15'),S('lcurl',3,'6–10'),S('calf_raise',4,'6–10')]},
+    {ja:'上半身・ハイパートロフィー',blocks:[
+      S('idp',3,'8–12'),S('srow',3,'8–12'),S('dshp',3,'8–12'),S('wide_pulldown',3,'8–12'),
+      S('cross',3,'12–15'),S('dcurl',3,'12–15'),S('pdown',3,'12–15'),S('hlr',3,'限界まで')]},
+    {ja:'下半身・ハイパートロフィー',blocks:[
+      S('front_sq',3,'8–12'),S('lunge',3,'8–12'),S('lext',3,'12–15'),
+      S('hip_thrust',3,'10–12'),
+      S('lcurl',3,'12–15'),S('calf_raise',4,'12–15')]}
+  ]}},
+
+ {id:'giant',ja:'ジャイアントセット',short:'ジャイアント',by:'ボディビル全般',goal:'pro',pro:1,
+  sched:{cycleDays:7,note:'3種類を1週間で1周'},
+  workSec:35,rest:120,axis:1.15,
+  core:'同一部位の4種目を1セットずつ休みなく通して1ラウンド。それを複数ラウンド。',
+  sig:'重い種目から軽い種目へ、レップを増やしながら通すのが定番。種目間は休まず、ラウンド間だけ2分前後。',
+  preset:{days:[
+    {ja:'胸・肩',blocks:[
+      RD(['bp','idp','fly','cross'],['8–10','8–12','10–15','12–15'],3),
+      RD(['dshp','side','clr','rear'],['8–10','10–12','12–15','15–20'],3)]},
+    {ja:'背中・腕',blocks:[
+      RD(['lat','srow','1drow','sarm'],['8–10','8–12','10–12','12–15'],3),
+      RD(['ez_curl','dcurl','ccurl','conc_curl'],['8–10','10–12','12–15','15–20'],3)]},
+    {ja:'脚・臀部・体幹',blocks:[
+      RD(['lp','lunge','lext','lcurl'],['10–12','10–12','12–15','15–20'],3),
+      RD(['hip_thrust','bsq_g','abduction'],['10–12','10–12','15–20'],2),
+      RD(['ccr','crun','plank'],['15–20','20–25','60秒'],2)]}
+  ]}},
+
+ {id:'y3t',ja:'Y3T',short:'Y3T',by:'Neil Hill',goal:'pro',pro:1,
+  sched:{cycleDays:5,note:'3種類を5日周期で回す。3週で1周期'},
+  workSec:38,rest:null,axis:1.10,weekly:1,
+  core:'3週で1周期。週ごとにブロックの型そのものを変える。',
+  sig:'第1週は高重量・低回数、第2週は中回数、第3週は高回数とジャイアントセットで代謝的に追い込む。ハックスクワットやレッグプレスの高回数が名物。'},
+
+ {id:'glute',ja:'お尻重点プログラム（女性向け）',short:'お尻重点',by:'—',workSec:40,rest:null,axis:1.02,
+  goal:'glutefocus',
+  sched:{cycleDays:7,note:'3種類を1週間で1周（下半身2回＋上半身1回）'},
+  core:'臀部を主役に置き、ヒンジ（股関節を折る動き）・スクワット・外転の3方向から週2回鍛える。',
+  sig:'ヒップスラストを中心に、ルーマニアンデッドリフト、ブルガリアンスクワット、アブダクションを組み合わせる。上半身は姿勢とシルエットを保つ最小限。',
+  note:'スクワットだけでは大臀筋上部と中臀筋への刺激が不足しがちです。ヒンジ（伸ばす）と外転（開く）を別々に入れているのはそのためです。',
+  preset:{days:[
+    {ja:'臀部・ハムストリング（ヒンジ中心）',blocks:[
+      S('hip_thrust',4,'8–12',{sigmark:1}),
+      S('rdl_g',4,'8–12',{sigmark:1}),
+      S('bsq_g',3,'10–12'),
+      S('lcurl',3,'12–15'),
+      S('abduction',3,'15–20',{sigmark:1})]},
+    {ja:'臀部・大腿（スクワット中心）',blocks:[
+      S('sq',4,'8–12'),
+      S('lp_high',3,'12–15',{sigmark:1}),
+      S('step_up',3,'10–12'),
+      S('cable_kick',3,'12–15'),
+      S('hyper_g',3,'12–15')]},
+    {ja:'上半身・体幹',blocks:[
+      S('lat',3,'10–12'),
+      S('db_press',3,'10–12'),
+      S('side',3,'12–15'),
+      S('srow',3,'10–12'),
+      S('dcurl',3,'12–15'),
+      S('pdown',3,'12–15'),
+      S('ccr',3,'15'),
+      S('plank',3,'45秒')]}
+  ]}},
+
+ {id:'arnold',ja:'Arnold式 高ボリューム',short:'Arnold式',by:'Arnold Schwarzenegger',goal:'pro',pro:1,
+  sched:{spw:6,note:'3種類の分割を、それぞれ週2回（合計週6回）で回す'},
+  workSec:35,rest:90,axis:1.45,
+  core:'2種目を交互に行うスーパーセットを、大量に積む。',
+  sig:'胸と背中を組み合わせたスーパーセット、ビハインドネックプレス、ダンベルプルオーバー、コンセントレーションカールが代名詞。',
+  note:'本来は1日2部位を朝晩に分けた二部練習でした。ここでは3分割を週2回ずつ（週6回）で近似しています。全盛期のプロが、当時の薬理と回復環境込みでやっていた量なので、通常の目安に対しては過剰に出ます。',
+  preset:{days:[
+    {ja:'胸・背中',blocks:[
+      PR(['bp','chin'],4,'8–10',{sigmark:1}),
+      PR(['idp','row'],4,'8–10'),
+      PR(['fly','cpo'],3,'10–12',{sigmark:1})]},
+    {ja:'肩・腕',blocks:[
+      S('btn_press',4,'8–10',{sigmark:1}),S('side',4,'10–12'),
+      PR(['bcurl','pdown'],4,'10–12'),
+      S('conc_curl',3,'12',{sigmark:1})]},
+    {ja:'脚・体幹',blocks:[
+      S('sq',4,'8–12'),S('lunge',3,'12'),S('lcurl',3,'12'),
+      S('hip_thrust',3,'10–12'),
+      S('calf_raise',4,'15'),S('crun',3,'25')]}
+  ]}}
+];
+
+/* Y3T：同じ種目構成に、週ごとに違うブロック型を当てる */
+(function buildY3T(){
+  const base=[
+    {ja:'胸・肩・三頭',ex:['inc_bb','db_press','smith_shp','side','skull']},
+    {ja:'背中・二頭',  ex:['yates_row','lat','csrow','cpo','ez_curl']},
+    {ja:'脚・臀部・体幹',ex:['sq','hack_sq','lp','lcurl','calf_raise','hip_thrust','ccr']}
+  ];
+  const y = METHODS.find(m=>m.id==='y3t');
+  y.presetWeeks = [
+    {label:'第1週：高重量・低回数', days: base.map(d=>({ja:d.ja, blocks:d.ex.map(id=>S(id,4,'6–10'))}))},
+    {label:'第2週：中重量・中回数', days: base.map(d=>({ja:d.ja, blocks:d.ex.map(id=>S(id,4,'12–15'))}))},
+    {label:'第3週：高回数・高密度', days: base.map(d=>({ja:d.ja, blocks:[
+        RD(d.ex.slice(0,4), ['20–25','20–25','25–30','25–30'], 3),
+        ...d.ex.slice(4).map(id=>S(id,3,'20–30'))]}))}
+  ];
+})();
+
+/* 各手法の中心的な主張を1行に要約したもの。
+   本人の発言の逐語的な引用ではなく、立場の要約です。 */
+/* 標準メニュー用の名言。すべて実在のプロボディビルダーに帰属して流通しているもの。
+   一次出典（本人の著書・公式インタビュー）まで確認できたわけではないが、
+   「その人物の言葉として広く伝わっている」ものだけを採用している。
+   （新しい言葉を作って実在の人物に帰属させることはしていない） */
+const MEMES = [
+ {line:'誰もがボディビルダーになりたがるが、重いものを持ちたがる奴はいない。', who:'Ronnie Coleman',
+  src:{en:'Everybody wants to be a bodybuilder, but don\u2019t nobody wanna lift no heavy ass weight.'}},
+ {line:'軽い、軽い！', who:'Ronnie Coleman',
+  src:{en:'Light weight, baby!'}},
+ {line:'ピーナッツみたいなもんだ。', who:'Ronnie Coleman',
+  src:{en:'Ain\u2019t nuttin\u2019 but a peanut.'}},
+ {line:'限界に達したとき、そこからがトレーニングの始まりだ。', who:'Ronnie Coleman',
+  src:{en:'When you hit failure your workout has just begun.'}},
+ {line:'一番の競争相手は、いつも自分自身だ。', who:'Ronnie Coleman',
+  src:{en:'My biggest competition is always myself.'}},
+ {line:'努力と練習。秘密の公式なんてない。', who:'Ronnie Coleman',
+  src:{en:'Hard work and training. There\u2019s no secret formula.'}},
+ {line:'効くのは最後の3〜4レップだ。そこが、チャンピオンとそうでない者を分ける。', who:'Arnold Schwarzenegger',
+  src:{en:'The last three or four reps is what makes the muscle grow.'}},
+ {line:'結果か、言い訳か。両方は手に入らない。', who:'Arnold Schwarzenegger',
+  src:{en:'You can have results or excuses. Not both.'}},
+ {line:'弱くあることは選択だ。強くあることも、同じだ。', who:'Dorian Yates',
+  src:{en:'Being weak is a choice, so is being strong.'}},
+ {line:'減量中は、頭が自分に嘘をつきはじめる。', who:'Dorian Yates',
+  src:{en:'During weight cutting your mind plays tricks on you.'}},
+ {line:'やる前に、まず思い描け。すべてを可能にするのは心だ。', who:'Kai Greene',
+  src:{en:'You have to think it before you can do it. The mind is what makes it all possible.'}},
+ {line:'何が自分にとって最善かという他人の考えに、汚染されるな。', who:'Kai Greene',
+  src:{en:'Do not let yourself be contaminated by others\u2019 ideas of what is best for you.'}},
+ {line:'車輪を発明し直す必要はない。', who:'Jay Cutler',
+  src:{en:'You don\u2019t need to reinvent the wheel.'}},
+ {line:'どう鍛えるかではなく、鍛え続けるかどうかが本当に大事だ。', who:'Jay Cutler',
+  src:{en:'It\u2019s not how you train but that you do train that really matters.'}},
+ {line:'鏡に映る姿が気に入らないなら、体重計の数字に何の意味がある。', who:'Vince Gironda',
+  src:{en:'If you don\u2019t like what you see in the mirror, what difference does it make what the scale says?'}}
+];
+let memeIdx = Math.floor(Math.random()*MEMES.length);
+
+const CREDO = {
+ std:   {line:'基準がなければ、多いのか少ないのかも分からない。', who:'—'},
+ hd:    {line:'他の連中はオーバートレーニングで、まともな重量すら挙げていない。', who:'Mike Mentzer',
+         src:{en:'Other contenders are overtrained, and aren’t lifting serious weights at all.', ref:'Fearless Motivation ほかで広く引用'}},
+ bg:    {line:'弱くあることは選択だ。強くあることも、同じだ。', who:'Dorian Yates',
+         src:{en:'Being weak is a choice, so is being strong.', ref:'LifeHack Quotes ほかで広く引用'}},
+ dc:    {line:'数字が更新されないなら、その日のトレーニングは失敗だった。', who:'Dante Trudel'},
+ fst7:  {line:'筋肉を締めつけているのは、筋肉自身ではなく、それを包む膜だ。', who:'Hany Rambod'},
+ gvt:   {line:'同じ重量で10セット挙げれば、身体はそれを日常だと認めざるを得ない。', who:'Charles Poliquin ら'},
+ g8x8:  {line:'鏡に映る姿が気に入らないなら、体重計の数字に何の意味がある。', who:'Vince Gironda',
+         src:{en:'If you don’t like what you see in the mirror, what difference does it make what the scale says?', ref:'Quotlr ほかで広く引用'}},
+ mdog:  {line:'最大の失敗は、故障して続けられなくなることだ。', who:'John Meadows'},
+ phul:  {line:'筋力と筋肥大は別の適応だ。どちらか一方を選ぶ理由がない。', who:'Layne Norton'},
+ giant: {line:'休憩は回復であると同時に、逃げ場でもある。', who:'ボディビル全般'},
+ y3t:   {line:'身体が慣れる前に、刺激の種類を変える。', who:'Neil Hill'},
+ glute: {line:'お尻はスクワットだけでは育たない。ヒンジと外転を、別に鍛える必要がある。', who:'—'},
+ arnold:{line:'結果か、言い訳か。両方は手に入らない。', who:'Arnold Schwarzenegger',
+         src:{en:'You can have results or excuses. Not both.', ref:'Arnold Schwarzenegger の言葉として広く引用'}}
+};
+
+/* ============================================================
+   3.5 プロプリセット専用の独自指標「トレーニング負荷スコア」
+   need/supply（週間有効セット）のモデルを使わず、
+   重量の目安（強度）・回数・インターバルの短さから部位ごとに積み上げる。
+   科学的に検証された指標ではなく、このツールが独自に定義した目安です。
+   ============================================================ */
+function repsMidpoint(repsStr){
+  if(!repsStr) return 8;
+  if(/限界/.test(repsStr)) return 10; // 限界までの表記は目安として10回とみなす
+  if(/秒/.test(repsStr)) return null; // プランクなど時間ベースはレップ数に換算しない
+  const nums = (repsStr.match(/\d+/g)||[]).map(Number);
+  if(!nums.length) return 8;
+  return nums.reduce((a,b)=>a+b,0)/nums.length;
+}
+/* レストポーズ（例："8–12 / 4–6 / 3–5"）は、休憩を挟んだ複数のミニセットが
+   1本の中に連続している。repsMidpointで平均を取ると、3ミニセットぶんの合計レップが
+   1ミニセット分に縮んでしまう。ここでは各区間の中央値を「合計」して、実際にこなした
+   総レップ数に近づける。 */
+function repsSum(repsStr){
+  if(!repsStr) return 8;
+  const parts = repsStr.split('/');
+  let total = 0, any = false;
+  parts.forEach(p=>{
+    const nums = (p.match(/\d+/g)||[]).map(Number);
+    if(nums.length){ total += nums.reduce((a,b)=>a+b,0)/nums.length; any = true; }
+  });
+  return any ? total : repsMidpoint(repsStr);
+}
+/* 努力度係数（旧・強度係数）：限界までの近さ＝RIR/RPEの考え方に合わせる。
+   トレーニング科学では「RPE7以上（限界まで残り3レップ以内）のセット＝ハードセット」を
+   有効な刺激の単位として数えるのが一般的。ここではその考え方を係数化している。
+   限界まで(RIR0-1)を基準1.0とし、通常(RIR2-3)、非限界(RIR4+)を段階的に下げる。 */
+function effortFactor(b){
+  if(b.toFailure || b.warmup) return 1.00; // 限界まで＝ハードセットの基準
+  if(b.submax) return 0.55;                 // 手法自体が「追い込まない」と定義：ハードセット未満
+  return 0.85;                              // 通常（限界手前で止める一般的なセット）
+}
+/* 休憩の補正：かつては「休憩が短いほど負荷が高い」として最大2.0倍まで掛けていたが、
+   これは誤りだった。休憩を削れば扱える重量は必然的に下がり、その低下は重量入力に既に表れる。
+   つまり倍率を掛けると同じ効果を二重に数えることになる（短い休憩で高重量は物理的に維持できない）。
+   実際、主要なトレーニング計算ツールも休憩時間をボリューム計算の乗数には使っていない。
+   ここでは代謝的ストレスのぶんだけを、±10%に収まる控えめな補正として残す。 */
+function restModifier(restSec){
+  return Math.max(0.90, Math.min(1.10, 1 + (60 - restSec)/600));
+}
+/* 1種目ぶんのスコア。重量(kg)が入力されていれば
+     ボリュームロード（実セット×平均レップ×重量）＝トネージ。実在するトレーニング指標
+   を主軸にし、未入力なら回数だけの目安（重量係数1）にフォールバックする。
+   科学的に検証された指標ではなく独自の目安です。 */
+/* 自重種目のうち、腕立て伏せ系は手足の角度（斜め懸垂に近い姿勢）のぶん、
+   実際にかかる負荷は体重より軽い。研究でよく引用される目安（体重の約64%）を使う。
+   出典を一つに特定できる数値ではなく、あくまで一般的な目安。
+   それ以外の自重種目（懸垂・ディップス・レッグレイズなど）は体重の100%とみなす。 */
+const BW_FRACTION = {pu:0.64};
+function exerciseScore(b, i, weightKg, bodyWeightKg){
+  if(b.blocked) return 0;
+  const repsSrc = b.gradedReps ? b.gradedReps[Math.min(i,b.gradedReps.length-1)] : b.reps;
+  // レストポーズは複数ミニセットの合計レップを使う。それ以外は中央値。
+  const reps = b.type==='restpause' ? repsSum(repsSrc) : repsMidpoint(repsSrc);
+  const repVal = reps===null ? 6 : reps; // 時間ベース種目は6回相当とみなす簡易換算
+  const phys = physSetsFor(b);
+  const ex = b.exs[i];
+  const unit = (ex && ex.loadUnit) || 'single';
+  let w;
+  if(unit==='bw'){
+    // 加重（重りを足した分）＋ 体重そのもの。体重が未入力なら、これまで通り回数だけの目安（係数1）に留める。
+    const added = (weightKg && weightKg>0) ? weightKg : 0;
+    if(bodyWeightKg && bodyWeightKg>0){
+      const frac = BW_FRACTION[ex && ex.id] ?? 1.0;
+      w = added + bodyWeightKg*frac;
+    } else {
+      w = added>0 ? added : 1; // 体重も加重も分からない場合のフォールバック
+    }
+  } else {
+    w = (weightKg && weightKg>0) ? (unit==='pair' ? weightKg*2 : weightKg) : 1;
+  }
+  const volume = phys * repVal * w;
+  return volume * effortFactor(b) * restModifier(b.rest);
+}
+/* そのブロック中、種目番号iの実セット数（種類によって物理セット数の意味が違う）。
+   round＝ラウンド数、pair＝周回数。
+   drop（ドロップセット）は、休まず重量を落として追い込みを継続するぶん、
+   1セット申告でも実際は複数段階＝それだけの追加ボリュームがある。
+   段階ごとに重量も下がる（目安：1段階につき約20%減）ため、
+   「段階数」をそのまま掛けると過大評価になる。ここでは段階数×0.8を
+   実質セット数の目安として使う（例：3段階なら2.4セット相当）。これは推定値。
+   restpauseはphysをそのまま1（1本）とし、合計レップ数（repsSum）の方で
+   複数ミニセットぶんの量を表現する。 */
+function physSetsFor(b){
+  if(b.type==='round') return b.rounds;
+  if(b.type==='pair') return b.sets;
+  if(b.type==='drop') return b.stages * 0.8;
+  return b.phys;
+}
+
+const PHIL = {
+ std:{era:'—',enemy:'—',text:'思想と呼べるものはありません。他のすべてがここから何を足し、何を削ったかを測るための基準点です。'},
+ hd:{era:'1970s–80s',enemy:'無駄なセットと、ジムに居る時間',text:'筋肉は刺激で成長するのではなく、回復で成長する。だから刺激は必要最小限でよく、それを超えた分は回復を妨げるだけの害になる——という立場です。「量が多いほど良い」という当時の常識を、科学ではなく信仰だと批判しました。'},
+ bg:{era:'1990s',enemy:'追い込みきらないセット',text:'強度は「限界まで行ったか、行かなかったか」で自分をごまかせない。一方で量は、こなした事実そのものが言い訳になる。だから1セットにすべてを賭ける——という考え方です。'},
+ dc:{era:'2000s',enemy:'記録を取らないトレーニング',text:'成長したかどうかは、重量が伸びたかどうかでしか判定できない。ノートの数字が更新されないなら、その日は失敗だった——と考えます。レストポーズも極端なストレッチも、記録を更新するための道具です。'},
+ fst7:{era:'2000s–',enemy:'筋肉を締めつけている筋膜',text:'筋肉を包む筋膜が物理的な制約になっている、という仮説から出発します。ただし筋膜仮説の科学的裏付けは弱く、効果があるとすれば単に高ボリュームの追い込みだから、という説明も成り立ちます。'},
+ gvt:{era:'1970s–90s',enemy:'中途半端な刺激量',text:'適応は総仕事量の関数である、という単純な発想です。同じ重量で10セットこなす頃には、身体は「この重量は日常だ」と判断せざるを得ない。'},
+ g8x8:{era:'1950s–70s',enemy:'重量への執着',text:'ボディビルは美容の競技であって、筋力の競技ではない——という立場です。重量を追えば骨格や不要な部位が太くなり、シルエットが崩れる。ベンチプレスやフルスクワットを嫌ったのも同じ理由でした。'},
+ mdog:{era:'2010s',enemy:'単調な刺激と、故障',text:'筋肉は1種類の刺激に慣れる。重い・伸ばす・詰める、と性質の違う刺激を順番に浴びせる。同時に、故障して続けられなくなることを最大のリスクと見ます。'},
+ phul:{era:'2010s–',enemy:'根拠のない伝統',text:'筋力と筋肥大は別の適応で、必要なレップ域も別。どちらか一方を選ぶ理由がない——という考え方です。思想というより、思想を疑う側の手法と言えます。'},
+ giant:{era:'—',enemy:'休憩そのもの',text:'休憩は回復であると同時に、逃げ場でもある。4種目を止まらずに通すことで、重量では届かない代謝的な追い込みに入る——という発想です。'},
+ y3t:{era:'2010s',enemy:'適応、つまり慣れ',text:'身体は数週間で慣れる。慣れる前に刺激の種類を変える。単一の刺激を信じる手法とは前提から違います。'},
+ glute:{era:'—',enemy:'スクワットだけで済ませること',text:'臀部は、股関節を伸ばす動き・膝を曲げる動き・脚を開く動きで、働く部位が変わります。スクワットだけでは大臀筋上部と中臀筋に十分な刺激が入りにくいため、ヒンジ（ヒップスラスト、ルーマニアンデッドリフト）と外転（アブダクション、キックバック）を別枠で確保する——という設計思想です。考案者のいる「手法」ではなく、目的から逆算した組み方です。'},
+ arnold:{era:'1960s–70s',enemy:'遠慮',text:'量は正義。可能な限り多くの刺激を、可能な限り高い頻度で。数値より「効いている感じ」を優先しました。Mentzerとは同時代に真正面から対立しています。'}
+};
+
+const SPLITS = {
+  1:[{ja:'全身',m:['chest','back','shoulder','arm','legs','glute','core']}],
+  2:[{ja:'上半身',m:['chest','back','shoulder','arm']},{ja:'下半身・体幹',m:['legs','glute','core']}],
+  3:[{ja:'プッシュ（胸・肩・三頭）',m:['chest','shoulder','arm']},{ja:'プル（背中・二頭）',m:['back','arm']},{ja:'脚・臀部・体幹',m:['legs','glute','core']}],
+  4:[{ja:'上半身 A',m:['chest','back','shoulder']},{ja:'下半身 A',m:['legs','glute']},{ja:'上半身 B',m:['shoulder','arm','chest']},{ja:'下半身 B',m:['legs','glute','core']}],
+  5:[{ja:'プッシュ',m:['chest','shoulder','arm']},{ja:'プル',m:['back','arm']},{ja:'脚・臀部',m:['legs','glute']},{ja:'上半身（補助）',m:['shoulder','chest','back']},{ja:'下半身・体幹',m:['legs','glute','core']}],
+  6:[{ja:'プッシュ A',m:['chest','shoulder','arm']},{ja:'プル A',m:['back','arm']},{ja:'脚 A',m:['legs','glute','core']},{ja:'プッシュ B',m:['chest','shoulder','arm']},{ja:'プル B',m:['back','arm']},{ja:'脚 B',m:['legs','glute','core']}]
+};
+const OVERHEAD_SEC = 600;
+
+/* ============================================================
+   4. ブロック生成 — セット数・時間・有効セットはここで確定する
+   ============================================================ */
+function makeBlock(spec, exs, ctx){
+  const W = ctx.workSec, r = spec.rest != null ? spec.rest : ctx.rest;
+  const b = {type:spec.type, exs, rest:r, role:spec.role||'', tag:spec.tag||'',
+             sigmark:!!spec.sigmark, warmup:!!spec.toFailure, submax:!!spec.submax,
+             reps: spec.reps || (exs[0].c ? '6–10' : '10–15')};
+  switch(spec.type){
+    case 'straight':
+      b.sets=spec.sets||3; b.phys=b.sets;
+      b.sec = b.sets*W + b.sets*r;
+      b.detail = `${b.sets}セット ・ セット間 ${r}秒` + (b.warmupSec?` ・ 前にウォームアップ約${Math.round(b.warmupSec/60)}分`:''); break;
+    case 'round': {
+      const n = exs.length;
+      b.rounds = spec.rounds || Math.max(2, Math.min(4, Math.round((ctx.target||9)/(n*BLOCK.round.eff))));
+      b.restIn = spec.restIn != null ? spec.restIn : 10;
+      b.phys = n*b.rounds;
+      b.sec  = b.rounds*(n*W + (n-1)*b.restIn) + b.rounds*r;
+      b.detail = `${n}種目を連続 × ${b.rounds}ラウンド ・ 種目間は休憩なし、ラウンド間 ${r}秒`; break; }
+    case 'restpause':
+      b.minis=spec.minis||3; b.pause=spec.pause||18; b.phys=1;
+      b.sec = b.minis*W + (b.minis-1)*b.pause + r;
+      b.detail = `限界 → ${b.pause}秒停止 → 再開 を${b.minis}回で1本 ・ ブロック後 ${r}秒`; break;
+    case 'drop':
+      b.stages=spec.stages||3; b.phys=1;
+      b.sec = Math.round(b.stages*W*0.8) + r;
+      b.detail = `限界後、重量を落として${b.stages}段階 ・ 段階間は休まない` + (b.warmupSec?` ・ 前にウォームアップ約${Math.round(b.warmupSec/60)}分`:''); break;
+    case 'pair':
+      b.sets=spec.sets||4; b.restIn=spec.restIn!=null?spec.restIn:0;
+      b.phys = exs.length*b.sets;
+      b.sec  = b.sets*(exs.length*W + b.restIn) + b.sets*r;
+      b.detail = `2種目を交互に${b.sets}周 ・ 種目間は休憩なし、ペア後 ${r}秒`; break;
+  }
+  b.eff = b.phys * BLOCK[spec.type].eff * (spec.toFailure ? FAILURE_BONUS : 1) * (spec.submax ? SUBMAX_DISCOUNT : 1);
+  if(spec.toFailure){
+    /* 本番1セットの前には、段階的に重量を上げるウォームアップが要る。
+       これを時間計算から省くと、実際より大幅に短く見えてしまう。 */
+    b.warmupSec = 2*W + 2*60; // ウォームアップ2セット＋セット間60秒（推定）
+    b.sec += b.warmupSec;
+  }
+  b.sec = Math.round(b.sec);
+  if(Array.isArray(spec.reps)) b.gradedReps = spec.reps, b.reps = spec.reps[0];
+  return b;
+}
+
+/* 標準のみ：設備からアルゴリズム生成 */
+/* 種目の並び順は「①ストレッチ・可動域の準備 → ②高重量・高張力（コンパウンド）→ ③パンプ・代謝ストレス」の
+   3段階を優先する。乱数（seed）による組み直しは、各段階の"中"でだけシャッフルする——
+   段階そのものの順序は変えない。これで組み直しても高重量がいきなり先頭に来ない。 */
+function exercisePhase(e){
+  if(e.str) return 0; // ①準備：ストレッチ位置・可動域を使う種目
+  if(e.c)   return 1; // ②高重量・高張力：コンパウンド
+  return 2;            // ③パンプ・代謝ストレス：アイソレーション（pmpタグ含む）
+}
+function orderPicks(pool, salt, seed){
+  return [...pool].map((v,i)=>[v, Math.sin((i+1)*97.31 + seed*13.7 + salt)])
+    .sort((a,b)=>a[1]-b[1]).map(x=>x[0])
+    .sort((a,b)=>exercisePhase(a)-exercisePhase(b)); // Array.sortは安定ソートなので、段階内のシャッフル順は保たれる
+}
+function composeMuscle({method, plan, pool, target, secBudget, hardCap, rest, seed, salt}){
+  const ctx={workSec:method.workSec, rest, target};
+  const blocks=[]; let eff=0, sec=0; const used=new Set();
+  const ordered=orderPicks(pool, salt, seed); let i=0;
+  const next=()=>{while(i<ordered.length&&used.has(ordered[i].id))i++;return ordered[i]||null;};
+  const push=b=>{ if(!b||sec+b.sec>hardCap||sec+b.sec>secBudget&&blocks.length) return false;
+                  blocks.push(b);eff+=b.eff;sec+=b.sec;return true; };
+  while(eff<target && blocks.length<(plan.maxBlocks||3)){
+    const e=next(); if(!e) break; used.add(e.id);
+    if(!push(makeBlock(plan.unit,[e],ctx))) break;
+  }
+  return {blocks, eff, sec};
+}
+
+/* ============================================================
+   5. 週の組み立て
+   ============================================================ */
+function reqMissing(ex){
+  const miss=[];
+  ex.req.forEach(g=>{ if(!g.some(q=>selected.has(q))) miss.push(g.map(q=>EQBY[q]).join('か')); });
+  return miss;
+}
+const available = ex => ex.req.every(g=>g.some(q=>selected.has(q)));
+
+/* 並び替え（種目の順番だけを変える。セット・レップ・休憩は変えない）。
+   blockOrder：日の中でブロック同士の並び順。exOrder：ラウンド/ペア1本の中の種目の並び順。 */
+let blockOrder = {}, exOrder = {};
+/* 手動追加した種目の記録。キーは 手法|週|日 → [{exId, sets, reps}, ...]（追加した順） */
+let manualAdds = {};
+const dayKey = (mid,wk,di) => `${mid}|${wk}|${di}`;
+function applyOrder(list, orderArr, keyFn){
+  if(!orderArr || !orderArr.length) return list;
+  const idx = k => { const i = orderArr.indexOf(k); return i<0 ? 1e9 : i; };
+  return list.map((item,i)=>({item,i,k:keyFn(item)}))
+    .sort((a,b)=> (idx(a.k)-idx(b.k)) || (a.i-b.i))
+    .map(x=>x.item);
+}
+
+/* 差し替え・スキップの記録。キーは 手法|週|日|ブロック|元の種目ID */
+let overrides = {};
+const ovKey = (mid,wk,di,bi,exId) => `${mid}|${wk}|${di}|${bi}|${exId}`;
+function resolveIds(ids, mid, wk, di, bi){
+  const exOrd = exOrder[`${mid}|${wk}|${di}|${bi}`];
+  let list = ids.map(id=>{
+    const o = overrides[ovKey(mid,wk,di,bi,id)];
+    if(o === 'skip') return null;
+    return {id: o || id, orig: id, swapped: !!o};
+  }).filter(Boolean);
+  if(exOrd) list = applyOrder(list, exOrd, r=>r.orig);
+  return list;
+}
+
+/* セット数・レップの手動編集（考案者の構成はそのまま、数値だけ変えたい場合）。
+   キーは 手法|週|日|ブロック。straight/restpause/drop のみ対象（種目が1つのブロック）。 */
+let setsRepsOv = {};
+const srKey = (mid,wk,di,bi) => `${mid}|${wk}|${di}|${bi}`;
+/* 種目ごとの重量(kg)。標準・プリセットの両方、全ブロック種類で編集できる。
+   キーは種目番号iまで含む＝ラウンド/ペアのように1ブロックに複数種目がある場合も個別に持てる。 */
+let weightOv = {};
+const weightKey = (mid,wk,di,bi,i) => `${mid}|${wk}|${di}|${bi}|${i}`;
+function applyEditOverride(b, so, workSec){
+  if(!so) return b;
+  if(so.reps!=null){ b.reps = so.reps; b.gradedReps = null; }
+  if(so.rest!=null) b.rest = so.rest;
+  if(so.sets!=null && b.type==='straight'){ b.sets = so.sets; b.phys = b.sets; }
+
+  if(so.sets!=null || so.rest!=null){
+    if(b.type==='straight'){
+      b.sec = b.sets*workSec + b.sets*b.rest + (b.warmupSec||0);
+      b.detail = `${b.sets}セット ・ セット間 ${b.rest}秒` + (b.warmupSec?` ・ 前にウォームアップ約${Math.round(b.warmupSec/60)}分`:'');
+    } else if(b.type==='restpause'){
+      b.sec = b.minis*workSec + (b.minis-1)*b.pause + b.rest;
+      b.detail = `限界 → ${b.pause}秒停止 → 再開 を${b.minis}回で1本 ・ ブロック後 ${b.rest}秒`;
+    } else if(b.type==='drop'){
+      b.sec = Math.round(b.stages*workSec*0.8) + b.rest;
+      b.detail = `限界後、重量を落として${b.stages}段階 ・ 段階間は休まない`;
+    }
+  }
+  b.eff = b.phys * BLOCK[b.type].eff * (b.toFailure?FAILURE_BONUS:1) * (b.submax?SUBMAX_DISCOUNT:1);
+  b.edited = true;
+  return b;
+}
+/* 週間のブロック構成が確定した後にまとめて集計する（need/supplyとは独立した指標）。 */
+/* ============================================================
+   体重・身長・性別から、部位ごとの目安の目標スコアを算出する。
+   ── 何が根拠で、何が独自の目安かをはっきり分けておく ──
+   ・BMI = 体重 ÷ 身長(m)² は標準的な計算式（実在）。
+   ・基準値22は、日本肥満学会が最も疾病リスクが低いとする値（実在の参照値）。
+     体重をこの基準に対する相対値（frameFactor）に変換するのに使う。
+   ・性別係数0.75（女性）は、平均的な除脂肪量・筋力の性差をならした
+     単一の概算値。個人差は非常に大きく、あくまで集団平均の目安。
+   ・部位配分（MUSCLE_SHARE）は、大まかな筋量比に基づく概算で、
+     出典のある数値ではない。
+   ・全体倍率K=240は、実際の重量入力を伴うボリュームロードと
+     オーダーが合うように、このツールが独自に置いた値。
+   → BMIの基準値22までは実在の参照値だが、そこから先の「目標スコア」
+     そのものはこのツール独自の推定であり、BMIのように疫学的な
+     裏付けがあるわけではない。
+   ============================================================ */
+const MUSCLE_SHARE = {chest:0.14, back:0.20, shoulder:0.10, arm:0.10, legs:0.24, glute:0.14, core:0.08};
+function computeBodyTarget(sex, weightKg, heightCm){
+  if(!weightKg || !heightCm || weightKg<=0 || heightCm<=0) return null;
+  const h = heightCm/100;
+  const bmi = weightKg/(h*h);
+  const frameFactor = Math.max(0.75, Math.min(1.35, bmi/22));
+  const sexFactor = sex==='f' ? 0.75 : sex==='m' ? 1.0 : 0.875;
+  const K = 285; // 中級者が現実的な重量を入力したときの実測スコアと釣り合うよう較正した値
+  const base = weightKg * frameFactor * sexFactor * K;
+  const target = {}; MORDER.forEach(m=> target[m] = base * MUSCLE_SHARE[m]);
+  return {target, bmi, frameFactor, sexFactor};
+}
+
+function computeScore(plans, rot, spw, mid, week, bodyWeightKg){
+  const raw={}; MORDER.forEach(m=>raw[m]=0);
+  plans.forEach(p=> p.groups.forEach(g=> g.blocks.forEach(b=>{
+    if(b.blocked) return;
+    b.exs.forEach((ex,i)=>{
+      const w = weightOv[weightKey(mid,week,p.di,g.bi,i)];
+      raw[ex.m] += exerciseScore(b, i, w, bodyWeightKg);
+    });
+  })));
+  const score={}; MORDER.forEach(m=> score[m] = raw[m]/rot*spw);
+  return score;
+}
+
+function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWeightKg}){
+  const secPerDay = mins*60 - OVERHEAD_SEC;
+  const supply={}; MORDER.forEach(m=>supply[m]=0);
+  const preset = method.presetWeeks ? method.presetWeeks[week] : (method.preset ? {days:method.preset.days} : null);
+
+  if(preset){
+    const missSet=new Set();
+    const raw={}; MORDER.forEach(m=>raw[m]=0);
+    /* ローテーションの種類数 ≠ 週の実施回数。
+       DCは2種類を週3回、Heavy Dutyは4種類を8日で回す。ここを混同してはいけない。 */
+    const sc = method.sched || {};
+    const rot = preset.days.length;
+    const spw = sc.spw != null ? sc.spw : (sc.cycleDays ? rot*7/sc.cycleDays : rot);
+    const needTotal = MORDER.reduce((a,m)=>a+goal.need[m],0);
+    const projected = () => MORDER.reduce((a,m)=>a+raw[m],0)/rot*spw;
+    const plans = preset.days.map((d,di)=>{
+      let sec=0; const groups=[];
+      d.blocks.forEach((spec,bi)=>{
+        const resolved = resolveIds(spec.exs || [spec.ex], method.id, week, di, bi);
+        if(!resolved.length) return;                      // 全部スキップされたブロックは消える
+        const exs = resolved.map(r=>EXBY[r.id]).filter(Boolean);
+        if(!exs.length) return;
+        const blocked = !exs.every(available);
+        if(blocked) exs.forEach(e=>{ if(!available(e)) reqMissing(e).forEach(x=>missSet.add(x)); });
+        const b = makeBlock(spec, exs, {workSec:method.workSec, rest, target:0});
+        b.blocked = blocked; b.keys = resolved.map(r=>ovKey(method.id,week,di,bi,r.orig));
+        b.swapped = resolved.map(r=>r.swapped); b.origIds = resolved.map(r=>r.orig);
+        applyEditOverride(b, setsRepsOv[srKey(method.id,week,di,bi)], method.workSec);
+        if(!blocked){ sec += b.sec; exs.forEach(e=> raw[e.m] += b.eff/exs.length); }
+        groups.push({m:exs[0].m, blocks:[b], bi:String(bi)});
+      });
+      const ordered = applyOrder(groups, blockOrder[dayKey(method.id,week,di)], g=>g.bi);
+      return {day:d, di, groups:ordered, sec};
+    });
+
+    /* 1回の時間に合わせた自動調整。
+       プロプリセット（考案者のメニュー）は対象外——時間を増やしても自動では増やさない。
+       余れば手動追加、増やしたければセット・レップを自分で編集する。 */
+    if(autoFit && !method.pro) plans.forEach(p=>{
+      const budget = secPerDay, g = p.groups;
+      const drop = b => { b.exs.forEach(e=> raw[e.m] -= b.eff/b.exs.length); p.sec -= b.sec; };
+      while(p.sec > budget && g.length > 1){
+        let ri = -1;
+        for(let k=g.length-1;k>=0;k--){
+          if(g[k].blocks[0].blocked) continue;
+          if(g.filter(x=>x.m===g[k].m && !x.blocks[0].blocked).length > 1){ ri=k; break; }
+        }
+        if(ri < 0) break;
+        drop(g[ri].blocks[0]); g[ri].blocks[0].trimmed=true; g.splice(ri,1);
+      }
+      const usedIds = new Set(g.flatMap(x=>x.blocks.flatMap(b=>b.exs.map(e=>e.id))));
+      const dayM = [...new Set(g.map(x=>x.m))];
+      if(!dayM.length) return;
+      for(let n=0;n<10;n++){
+        if(projected() >= needTotal*1.1) break;          // 目標を十分超えたら足さない
+        const m = dayM[n % dayM.length];
+        if(raw[m]/rot*spw >= goal.need[m]*1.15) continue; // その部位が足りていれば飛ばす
+        const cand = EX.find(e=>e.m===m && available(e) && !usedIds.has(e.id));
+        if(!cand) continue;
+        const spec = method.filler || {type:'straight',sets:3,reps:'10–12'};
+        const key = ovKey(method.id, week, p.di, 'add'+n, cand.id);
+        if(overrides[key] === 'skip') { usedIds.add(cand.id); continue; }
+        const real = overrides[key] && EXBY[overrides[key]] ? EXBY[overrides[key]] : cand;
+        const fb = makeBlock(spec, [real], {workSec:method.workSec, rest, target:6});
+        if(p.sec + fb.sec > budget) break;
+        fb.added = true; fb.keys=[key]; fb.swapped=[!!overrides[key]]; fb.blocked=!available(real); fb.origIds=[cand.id];
+        p.sec += fb.sec; raw[real.m] += fb.eff;
+        usedIds.add(cand.id); usedIds.add(real.id);
+        g.push({m:real.m, blocks:[fb], bi:'auto'+n});  // 既に文字列
+      }
+    });
+
+    // 手動追加（ユーザーが任意に足した種目）。自動調整の対象外＝常に残る。時間・収支はここで再集計される
+    plans.forEach(p=>{
+      const list = manualAdds[dayKey(method.id, week, p.di)];
+      if(list && list.length) list.forEach((entry,idx)=>{
+        const ex = EXBY[entry.exId]; if(!ex) return;
+        const blocked = !available(ex);
+        const mb = makeBlock({type:'straight', sets:entry.sets, reps:entry.reps}, [ex], {workSec:method.workSec, rest, target:0});
+        mb.blocked = blocked; mb.manual = true; mb.origIds=[entry.exId]; mb.keys=['']; mb.swapped=[false];
+        applyEditOverride(mb, setsRepsOv[srKey(method.id,week,p.di,'manual'+idx)], method.workSec);
+        if(!blocked) raw[ex.m] = (raw[ex.m]||0) + mb.eff;
+        p.groups.push({m:ex.m, blocks:[mb], bi:'manual'+idx, manual:true});
+      });
+      if(list && list.length) p.sec = p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.sec),0),0);
+    });
+
+    MORDER.forEach(m=> supply[m] = raw[m]/rot*spw);
+    const score = computeScore(plans, rot, spw, method.id, week, bodyWeightKg);
+    return {plans, supply, score, secPerDay, missing:[...missSet],
+            planLabel:method.presetWeeks?preset.label:null, isPreset:1,
+            rot, spw, schedNote:sc.note||''};
+  }
+
+  // 標準：自動生成
+  const poolByMuscle={}; MORDER.forEach(m=>poolByMuscle[m]=EX.filter(e=>e.m===m&&available(e)));
+  const split = SPLITS[days];
+  const appear={}; MORDER.forEach(m=>appear[m]=split.filter(d=>d.m.includes(m)).length||0);
+  const plans = split.map((d,di)=>{
+    const need=d.m.map(m=>goal.need[m]/(appear[m]||1));
+    const sum=need.reduce((a,b)=>a+b,0)||1;
+    let carry=0, remaining=secPerDay;
+    const groups=d.m.map((m,mi)=>{
+      if(!poolByMuscle[m].length) return null;
+      const share=secPerDay*(need[mi]/sum)+carry;
+      const r=composeMuscle({method, plan:method.plan, pool:poolByMuscle[m], target:need[mi],
+              secBudget:Math.min(share,remaining), hardCap:remaining, rest, seed, salt:di*7+mi});
+      carry=share-r.sec; remaining-=r.sec;
+      return {m, ...r};
+    }).filter(g=>g&&g.blocks.length);
+    // 自動生成側の差し替え・スキップ。プリセットと同じ「1グループ1ブロック」構造に平坦化し、並び替えも使えるようにする
+    let bi=0;
+    const flat=[];
+    groups.forEach(g=>{
+      g.blocks.forEach(b=>{
+        const orig=b.exs[0].id, k=ovKey(method.id,week,di,bi,orig), o=overrides[k];
+        b.keys=[k]; b.swapped=[!!o]; b.origIds=[orig];
+        const myBi=bi; bi++;
+        if(o==='skip') return;
+        if(o && EXBY[o]) b.exs=[EXBY[o]];
+        applyEditOverride(b, setsRepsOv[srKey(method.id,week,di,String(myBi))], method.workSec);
+        flat.push({m:g.m, blocks:[b], bi:String(myBi)});
+      });
+    });
+    const ordered = applyOrder(flat, blockOrder[dayKey(method.id,week,di)], gr=>gr.bi);
+    ordered.forEach(gr=> supply[gr.m]+=gr.blocks[0].eff);
+    return {day:d, di, groups:ordered, sec:ordered.reduce((s,gr)=>s+gr.blocks[0].sec,0)};
+  });
+
+  // 手動追加（標準モード）
+  plans.forEach(p=>{
+    const list = manualAdds[dayKey(method.id, week, p.di)];
+    if(!list || !list.length) return;
+    list.forEach((entry,idx)=>{
+      const ex = EXBY[entry.exId]; if(!ex) return;
+      const blocked = !available(ex);
+      const mb = makeBlock({type:'straight', sets:entry.sets, reps:entry.reps}, [ex], {workSec:method.workSec, rest, target:0});
+      mb.blocked = blocked; mb.manual = true; mb.origIds=[entry.exId]; mb.keys=['']; mb.swapped=[false];
+      applyEditOverride(mb, setsRepsOv[srKey(method.id,week,p.di,'manual'+idx)], method.workSec);
+      if(!blocked) supply[ex.m] = (supply[ex.m]||0) + mb.eff;
+      p.groups.push({m:ex.m, blocks:[mb], bi:'manual'+idx, manual:true});
+    });
+    p.sec = p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.sec),0),0);
+  });
+
+  const score = computeScore(plans, split.length, split.length, method.id, week, bodyWeightKg);
+  return {plans, supply, score, secPerDay, missing:[], planLabel:null, isPreset:0,
+          rot:split.length, spw:split.length, schedNote:''};
+}
+
+/* ============================================================
+   6. 画面
+   ============================================================ */
+let selected = new Set(DEFAULT_ON), seed = 1, lastMissingEq = [], currentWk = null, currentMethod = null;
+const $ = s => document.querySelector(s);
+const rnd = n => Math.round(n*10)/10;
+
+function paintEquip(){
+  $('#equip').innerHTML = EQUIP.map(e=>`<label class="chip${selected.has(e.id)?' on':''}" data-eq="${e.id}"><input type="checkbox" ${selected.has(e.id)?'checked':''}>${e.ja}</label>`).join('');
+}
+paintEquip();
+$('#equip').addEventListener('change',ev=>{const l=ev.target.closest('.chip');if(!l)return;
+  ev.target.checked?selected.add(l.dataset.eq):selected.delete(l.dataset.eq);
+  l.classList.toggle('on',ev.target.checked); render();});
+$('#goal').innerHTML = GOALS.map(g=>`<option value="${g.id}">${g.ja}</option>`).join('');
+let proUnlocked = false;
+function paintMethodOptions(){
+  const cur = $('#method').value;
+  const visible = METHODS.filter(m=>!m.pro || proUnlocked);
+  $('#method').innerHTML = visible.map(m=>`<option value="${m.id}">${m.ja}${m.by!=='—'?'（'+m.by+'）':''}</option>`).join('');
+  if(visible.some(m=>m.id===cur)) $('#method').value = cur;
+}
+paintMethodOptions();
+['days','mins','rest','goal','method','week','autoFit','bSex','bWeight','bHeight'].forEach(id=>$('#'+id).addEventListener('change',render));
+$('#reroll').addEventListener('click',()=>{seed++;render();});
+$('#fixEquip').addEventListener('click',()=>{
+  const m = METHODS.find(x=>x.id===$('#method').value);
+  const preset = m.presetWeeks ? m.presetWeeks[+$('#week').value] : m.preset;
+  if(preset) preset.days.forEach(d=>d.blocks.forEach(sp=>{
+    (sp.exs||[sp.ex]).forEach(id=>{
+      const e=EXBY[id]; if(!e) return;
+      e.req.forEach(gp=>{ if(!gp.some(q=>selected.has(q))) selected.add(gp[0]); });
+    });
+  }));
+  paintEquip(); render();
+});
+
+function render(){
+  const method = METHODS.find(m=>m.id===$('#method').value);
+  const week = +$('#week').value;
+  $('#weekField').classList.toggle('hide', !method.presetWeeks);
+  const isPreset = !!(method.preset || method.presetWeeks);
+  const preset = method.presetWeeks ? method.presetWeeks[week] : method.preset;
+  if(isPreset){ $('#days').disabled=true; } else $('#days').disabled=false;
+  const restSel=$('#rest');
+  if(method.rest!==null){ restSel.value=String(method.rest); restSel.disabled=true; } else restSel.disabled=false;
+
+  if(method.goal){ $('#goal').value=method.goal; $('#goal').disabled=true; } else $('#goal').disabled=false;
+  const autoFitBox = $('#autoFit');
+  autoFitBox.disabled = !!method.pro;
+  if(method.pro) autoFitBox.checked = false;
+  $('#autoFitLabel').classList.toggle('disabled', !!method.pro);
+  const days=+$('#days').value, mins=+$('#mins').value, rest=+restSel.value;
+  const goal=GOALS.find(g=>g.id===$('#goal').value);
+  $('#goalHint').textContent = goal.hint;
+
+  $('#methodCard').innerHTML = `<span class="by">${method.by}</span>${method.core}
+    <span class="sig"><b>定番種目：</b>${method.sig}</span>`
+    + (method.sched?`<span class="sig"><b>回し方：</b>${method.sched.note}</span>`:'')
+    + (method.note?`<span class="warn">${method.note}</span>`:'');
+
+  drawPhil(method);
+  drawConv(method, preset);
+
+  const wk = buildWeek({method, week, days, mins, rest, goal, seed, autoFit:$('#autoFit').checked, bodyWeightKg:+$('#bWeight').value || null});
+  currentWk = wk; currentMethod = method;
+  if(isPreset){ $('#days').value=String(Math.max(1,Math.min(6,Math.round(wk.spw)))); $('#days').disabled=true; }
+
+  $('#timeHint').innerHTML = `1回<b>${mins}分</b>から準備<b>10分</b>を引いた<b>${mins-10}分</b>が、ブロックを詰められる枠です。`
+    + (isPreset?`<br>この手法はプリセットです。ワークアウトは<b>${wk.rot}種類</b>、実施は<b>週${rnd(wk.spw)}回</b>で固定されます（種類数と回数は別物です）。`:'')
+    + (restSel.disabled?`<br>インターバルもこの手法が規定するため変更できません。`:'')
+    + (method.goal?`<br>この手法は目標を「${GOALS.find(g=>g.id===method.goal).ja}」に固定します。`:'')
+    + (method.pro?`<br><b>内容は考案者の構成に固定されており、時間を増やしても自動では増えません。</b>増やしたい場合は「＋ 種目を追加」か、各種目の「編集」でセット・レップ数を変えてください。`:'');
+  lastMissingEq = wk.missing;
+  $('#fixEquip').classList.toggle('hide', !wk.missing.length);
+  if(wk.missing.length) $('#fixEquip').textContent = `不足設備をONにする（${wk.missing.join('、')}）`;
+
+  const needTotal   = MORDER.reduce((s,m)=>s+goal.need[m],0);
+  const supplyTotal = MORDER.reduce((s,m)=>s+wk.supply[m],0);
+  const useScore = method.pro || method.id==='std'; // 独自スコア方式。お尻重点プログラムなど目的別プリセットは従来の収支のまま
+
+  if(useScore){
+    const bt = computeBodyTarget($('#bSex').value, +$('#bWeight').value, +$('#bHeight').value);
+    $('#unitNote').textContent = `TRAINING LOAD SCORE ・ ${wk.planLabel || method.short}`;
+    drawScorePanel(wk, bt);
+    $('#bmiHint').innerHTML = bt
+      ? `BMI ${bt.bmi.toFixed(1)}（基準値22との比で目標スコアを調整）`
+      : `体重と身長を入力すると、部位ごとの目安の目標スコアが表示されます。`;
+  } else {
+    $('#unitNote').textContent = `EFFECTIVE SETS / WEEK ・ ${wk.planLabel || method.short}`;
+    drawRail(goal.need, needTotal, supplyTotal);
+    drawLegend(goal.need, wk.supply);
+    drawVerdict({method, goal, wk, needTotal, supplyTotal, days, mins, rest, isPreset});
+    $('#bmiHint').textContent = '';
+  }
+  setCredo(method);
+  drawMenu({method, wk, mins});
+  $('#resetSwap').classList.toggle('hide', !Object.keys(overrides).length && !Object.keys(blockOrder).length && !Object.keys(exOrder).length && !Object.keys(setsRepsOv).length && !Object.keys(manualAdds).length && !Object.keys(weightOv).length);
+  drawFoot();
+  const isP = wk.isPreset;
+  $('#reroll').disabled = !!isP;
+  $('#rerollHint').textContent = isP
+    ? 'プリセットは考案者の構成に固定されているため、ここでは組み直せません。種目ごとの「差し替え」ボタンか、ドラッグでの並び替えをお使いください。'
+    : '設備の中からランダムに種目を選び直します（順番は①準備のストレッチ種目→②高重量のコンパウンド→③パンプ系アイソレーションを優先し、この並びは組み直しても変わりません）。';
+  saveToLocal();
+}
+
+function drawConv(method, preset){
+  if(method.pro || method.id==='std'){
+    $('#conv').innerHTML = `<h3>トレーニング負荷スコアの計算式（このツール独自の目安）</h3>
+      <table class="wide">
+        <tr><td>ボリュームロード</td><td>実セット数 × 平均レップ数 × 重量(kg)</td><td>トネージとも呼ばれる、実在するトレーニング指標</td></tr>
+        <tr><td>未入力時の代用</td><td>実セット数 × 平均レップ数 × 1</td><td>重量が未入力の種目は、回数だけの目安に落とす</td></tr>
+        <tr class="on"><td>重量欄の意味</td><td>「kg/片手」は入力を2倍 ・ 「加重kg」は05の体重＋入力値</td><td>ダンベルを両手に1個ずつ持つ種目は片手分の入力を2倍。自重種目は加重が空でも、05で入力した体重を負荷として使う（腕立て伏せは体重の約64%、それ以外は100%）</td></tr>
+        <tr class="on"><td>努力度係数</td><td>&times;1.00 / &times;0.85 / &times;0.55</td><td>限界まで（RIR0-1・ハードセット）／ 通常（RIR2-3）／ 非限界（手法自体が追い込まないと定義）</td></tr>
+        <tr class="on"><td>休憩の補正</td><td>1 +（60 − 休憩秒）÷ 600（0.90〜1.10）</td><td>±10%に収まる控えめな補正。休憩を削れば扱える重量は下がり、それは重量入力に既に表れるため</td></tr>
+      </table>
+      <p class="convnote">スコア ＝ ボリュームロード（または代用値） × 努力度係数 × 休憩の補正 を部位ごとに積み上げたもの。ボリュームロードと「ハードセット（RIR0〜3）」の考え方はトレーニング科学で使われる実在の枠組みですが、係数の具体的な数値はこのツールが独自に置いたものです。<b>各種目の重量欄に入力するほど、実際の負荷に近い数字になります。</b>入力欄の単位（kg／kg/片手／加重kg）は種目ごとに変わります。<b>自重種目の「加重kg」は空欄のままでよく、05で体重を入力していればその体重を負荷として自動的に使います</b>（腕立て伏せは姿勢のぶん体重の約64%、懸垂・ディップスなどは100%として計算。05を未入力の場合のみ、回数だけの目安に戻ります）。</p>
+      <h3 style="border-top:1px solid var(--rule)">目安の目標スコアの計算式（05の体重・身長から）</h3>
+      <table class="wide">
+        <tr><td>BMI</td><td>体重(kg) ÷ 身長(m)²</td><td>標準的な計算式（実在）</td></tr>
+        <tr><td>体格係数</td><td>BMI ÷ 22（0.75〜1.35の範囲）</td><td>22は日本肥満学会が最も疾病リスクが低いとする基準値（実在の参照値）</td></tr>
+        <tr class="on"><td>性別係数</td><td>男性 &times;1.00 ／ 女性 &times;0.75 ／ 回答しない &times;0.875</td><td>平均的な除脂肪量・筋力差をならした概算。個人差は非常に大きい</td></tr>
+        <tr class="on"><td>部位配分</td><td>背中20% 脚24% 胸14% 臀部14% 肩10% 腕10% 体幹8%</td><td>大まかな筋量比に基づく概算で、出典のある数値ではない</td></tr>
+      </table>
+      <p class="convnote">目標スコア ＝ 体重 × 体格係数 × 性別係数 × 240（このツール独自の倍率） × 部位配分。<b>BMIと基準値22までは実在の参照値ですが、そこから先の目標スコアはこのツール独自の推定です。</b>BMIのような疫学的な裏付けがあるわけではなく、あくまで一つの目安として使ってください。</p>`;
+    return;
+  }
+  const used=new Set();
+  if(preset) preset.days.forEach(d=>d.blocks.forEach(b=>used.add(b.type)));
+  else used.add('straight');
+  const fail = preset && preset.days.some(d=>d.blocks.some(b=>b.toFailure));
+  const submax = preset && preset.days.some(d=>d.blocks.some(b=>b.submax));
+  $('#conv').innerHTML = `<h3>ブロック1本あたりの有効セット換算（推定）</h3><table>` +
+    Object.keys(BLOCK).map(k=>`<tr class="${used.has(k)?'on':''}"><td>${BLOCK[k].ja}</td><td>&times;${BLOCK[k].eff.toFixed(2)}</td><td>${BLOCK[k].desc}</td></tr>`).join('') +
+    (fail?`<tr class="on"><td>限界までの追い込み</td><td>&times;${FAILURE_BONUS.toFixed(2)}</td><td>そのセットを限界まで行う場合の割り増し</td></tr>`:'') +
+    (submax?`<tr class="on"><td>非限界（サブマキシマル）</td><td>&times;${SUBMAX_DISCOUNT.toFixed(2)}</td><td>手法自体が「限界まで追い込まない」と定義している場合の割引</td></tr>`:'') + `</table>`;
+}
+
+function drawScorePanel(wk, bt){
+  const scores = wk.score;
+  const target = bt ? bt.target : null;
+  const max = Math.max(1, ...MORDER.map(m=>scores[m]), ...(target?MORDER.map(m=>target[m]):[0]));
+  $('#railHost').innerHTML = `<div class="score-bars">${MORDER.map(m=>{
+    const v = Math.round(scores[m]);
+    const pct = Math.max(2, v/max*100);
+    const tPct = target ? Math.min(100, target[m]/max*100) : null;
+    return `<div class="score-row">
+      <span class="score-label">${MUSCLES[m].ja}</span>
+      <div class="score-track">
+        <div class="score-fill" style="width:${pct}%;background:${MUSCLES[m].color}"></div>
+        ${tPct!=null?`<div class="score-target" style="left:${tPct}%" title="目安の目標 ${Math.round(target[m])}"></div>`:''}
+      </div>
+      <span class="score-val">${v}${target?`<small>／${Math.round(target[m])}</small>`:''}</span>
+    </div>`;
+  }).join('')}</div>`;
+  $('#legend').innerHTML = target
+    ? `<span class="lg"><span class="dot" style="background:var(--ink)"></span>実際のスコア</span><span class="lg"><span class="score-target-lg"></span>目安の目標スコア（体重・身長から算出）</span>`
+    : '';
+  const sorted = [...MORDER].sort((a,b)=>scores[b]-scores[a]);
+  const top = sorted[0], bottom = sorted[sorted.length-1];
+  let html = `<span class="verdict-tag">トレーニング負荷スコア</span>
+    <p>最もスコアが高いのは<span class="num">${MUSCLES[top].ja}</span>（${Math.round(scores[top])}）、最も低いのは<span class="num">${MUSCLES[bottom].ja}</span>（${Math.round(scores[bottom])}）です。</p>`;
+  const notes = [];
+  if(target){
+    const short = MORDER.filter(m=>scores[m] < target[m]*0.9);
+    notes.push(`点線はBMI（基準値22）と体重・身長から算出した<b>目安の目標スコア</b>です。BMIの基準値自体は実在の参照値ですが、目標スコアの数値自体はこのツール独自の推定です。`);
+    notes.push(short.length
+      ? `目安の目標に届いていない部位：${short.map(m=>`${MUSCLES[m].ja}（${Math.round(scores[m])}／${Math.round(target[m])}）`).join('、')}`
+      : `全部位が目安の目標スコアに届いています。`);
+  } else {
+    notes.push(`05で体重・身長を入力すると、部位ごとの目安の目標スコアが点線で表示されます。`);
+  }
+  notes.push(`need/supplyのような達成率ではなく、<b>重量の入力・回数・休憩の短さから積み上げた、このツール独自の負荷指標</b>です。下の換算表も参考にしてください。`);
+  html += `<ul class="notes">${notes.map(n=>`<li>${n}</li>`).join('')}</ul>`;
+  $('#verdict').innerHTML = html;
+}
+
+function setCredo(method){
+  // 標準メニューはボディビル格言・ミームからランダムに表示（ダブルタップでシャッフル）
+  const isStd = method.id === 'std';
+  const c = isStd ? MEMES[memeIdx] : CREDO[method.id];
+  const h = $('#headline');
+  if(h.textContent !== c.line){
+    h.classList.add('fade');
+    setTimeout(()=>{ h.textContent = c.line; h.classList.remove('fade'); },180);
+  }
+  const q = c.src;
+  const tapHint = isStd
+    ? '<br><span class="tap-hint">ダブルタップで別の格言に切り替わります。</span>'
+    : '';
+  $('#attrib').innerHTML = c.who==='—'
+    ? `<b>${method.ja}</b><span class="disc">${q?'':'考案者のいる手法ではなく、目的から逆算した組み方です。'}${tapHint}</span>`
+    : q
+      ? `<b>${c.who}</b>${isStd?'':' ・ '+method.ja}<span class="disc">原文：<span class="hand-quote">${q.en}</span><br>${q.ref ? q.ref+'。' : '本人の言葉として広く流通しているものです。'}${isStd?'一次出典までは未確認です。':'一次出典（書籍・インタビュー）までは未確認です。'}${tapHint}</span>`
+      : `<b>${c.who}</b> ・ ${method.ja}<span class="disc">主張の要約です。逐語的な引用が確認できなかったため、本人の発言としては扱っていません。${tapHint}</span>`;
+}
+
+function drawRail(need, needTotal, supply){
+  const host=$('#railHost'), scale=Math.max(needTotal,supply)*1.06||1;
+  if(!host.querySelector('.rail')) host.innerHTML=`<div class="rail-outer"><div class="rail"><div class="rail-fill">${
+    MORDER.map(m=>`<div class="seg" data-m="${m}" style="background:${MUSCLES[m].color}"><span></span></div>`).join('')
+  }</div><div class="overflow"></div><div class="cap"><b></b></div></div></div>`;
+  MORDER.forEach(m=>{const el=host.querySelector(`.seg[data-m="${m}"]`),p=need[m]/scale*100;
+    el.style.width=p+'%'; el.classList.toggle('wide',p>6); el.querySelector('span').textContent=need[m];});
+  const cp=supply/scale*100, cap=host.querySelector('.cap');
+  cap.style.left=cp+'%'; cap.querySelector('b').textContent=`供給 ${Math.round(supply)}`;
+  cap.classList.toggle('flip',cp>78);
+  const ov=host.querySelector('.overflow');
+  ov.style.left=cp+'%'; ov.style.width = needTotal>supply ? (needTotal-supply)/scale*100+'%' : '0%';
+}
+function drawLegend(need, supply){
+  $('#legend').innerHTML = MORDER.map(m=>{const s=rnd(supply[m]);
+    return `<span class="lg"><span class="dot" style="background:${MUSCLES[m].color}"></span>${MUSCLES[m].ja}
+      <em>要求 ${need[m]}</em><em class="${s<need[m]?'short':''}">／供給 ${s}</em></span>`;}).join('');
+}
+
+function drawVerdict(o){
+  const {method,goal,wk,needTotal,supplyTotal,days,mins,rest,isPreset}=o;
+  const secPerSession = wk.plans.reduce((s,p)=>s+p.sec,0)/Math.max(1,wk.plans.length);
+  const usedSec = secPerSession*wk.spw, availSec = wk.secPerDay*wk.spw;
+  const timeUse=availSec>0?usedSec/availSec:0;
+  const overDays=wk.plans.filter(p=>Math.round(p.sec/60)+10>mins).length;
+  const shortM=MORDER.filter(m=>wk.supply[m]<goal.need[m]*0.9);
+  let tag,cls='',body='',notes=[],state;
+
+  if(wk.missing.length && supplyTotal===0){
+    state='gear'; tag='設備不足'; cls='ng';
+    body=`このプリセットに必要な設備が揃っていません：<b>${wk.missing.join('、')}</b>`;
+  } else if(overDays > 0){
+    state='over'; tag='時間に収まらない'; cls='ng';
+    const longest=Math.max(...wk.plans.map(p=>Math.round(p.sec/60)+10));
+    body=`${overDays}日ぶんのルーティンが、設定した<span class="num">${mins}</span>分に収まりません（最長で<span class="num">${longest}</span>分）。
+      プリセットは考案者の構成をそのまま置いているため、時間に合わせて自動で削っていません。`;
+    notes.push(`1回を${Math.ceil(longest/15)*15}分にする`);
+    notes.push('種目を自分で間引く（ただし手法の構成は崩れます）');
+  } else if(supplyTotal>=needTotal*1.6){
+    state='loose'; tag='時間の使いすぎ';
+    body=`この構成が週に供給する有効セットは<span class="num">${Math.round(supplyTotal)}</span>。「${goal.ja}」の要求<span class="num">${needTotal}</span>を大きく上回っています。`;
+    notes.push('目標に対して過剰です。回復が追いつかない可能性があります。');
+  } else if(supplyTotal>=needTotal){
+    state='ok'; tag='達成可能';
+    body=`週<span class="num">${rnd(wk.spw)}</span>回 × <span class="num">${mins}</span>分。この構成が供給する有効セットは週<span class="num">${Math.round(supplyTotal)}</span>で、「${goal.ja}」の要求<span class="num">${needTotal}</span>を満たします。`;
+  } else if(!isPreset && timeUse>0.92){
+    state='time'; tag='時間が足りない'; cls='ng';
+    body=`時間予算をほぼ使い切っていますが、供給できた有効セットは週<span class="num">${Math.round(supplyTotal)}</span>。要求<span class="num">${needTotal}</span>に<span class="num">${Math.round(needTotal-supplyTotal)}</span>足りません。<b>制約は時間の側にあります。</b>`;
+    notes.push(`回数を週${days+1}回に増やす`); notes.push(`1回を${mins+15}分に伸ばす`);
+  } else {
+    state='method'; tag='手法が制約'; cls='ng';
+    body=`時間はまだ<span class="num">${Math.round((availSec-usedSec)/60)}</span>分余っているのに、供給できた有効セットは週<span class="num">${Math.round(supplyTotal)}</span>で、要求<span class="num">${needTotal}</span>に届きません。<b>制約は時間ではなく、この手法の構造にあります。</b>`;
+    notes.push('時間を増やしても、この構成のままでは供給は増えません。手法を変えるか、目標を下げる必要があります。');
+  }
+
+  if(wk.missing.length && supplyTotal>0)
+    notes.push(`設備が足りず除外した種目があります（必要：${wk.missing.join('、')}）。上のボタンでONにできます。`);
+  if(shortM.length && state!=='loose')
+    notes.push(`供給が不足している部位：${shortM.map(m=>`${MUSCLES[m].ja}（要求${goal.need[m]} / 供給${rnd(wk.supply[m])}）`).join('、')}`);
+  if(method.disputes && supplyTotal<needTotal)
+    notes.push({strong:1,t:`ただし${method.ja}は、この「週10〜20セット」という要求量の考え方そのものを否定する立場の手法です。この判定は、量を基準に置く側からの評価にすぎません。`});
+  if(wk.planLabel) notes.push(`表示中は「${wk.planLabel}」です。他の週は上のセレクタで切り替えられます。`);
+
+  $('#verdict').innerHTML=`<span class="verdict-tag ${cls}">${tag}</span><p>${body}</p>`+
+    (notes.length?`<ul class="notes">${notes.map(n=>typeof n==='string'?`<li>${n}</li>`:`<li class="strong">${n.t}</li>`).join('')}</ul>`:'');
+  return state;
+}
+
+function drawMenu({method, wk, mins}){
+  const isP = wk.isPreset;
+  const wkIdx = +$('#week').value;
+  const bwKg = +$('#bWeight').value || null;
+  const html = wk.plans.map(p=>{
+    const est=Math.round(p.sec/60)+10, over=est>mins;
+    const eff=rnd(p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.eff),0),0));
+    const phys=p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.phys),0),0);
+    const nBlk = p.groups.length;
+    return `<article class="day">
+      <div class="day-head"><span class="day-no">${wk.isPreset?String.fromCharCode(65+p.di):String(p.di+1).padStart(2,'0')}</span>
+        <span class="day-name">${p.day.ja}</span>
+        <span class="day-meta ${over?'over':''}">実セット ${phys} ・ 有効 ${eff} ・ 約${est}分${over?' ⚠時間超過':''}</span></div>
+      <div class="blk-list" data-di="${p.di}">
+      ${p.groups.map((g,gi)=>g.blocks.map(b=>`
+        <div class="blk${b.blocked?' blocked':''}" data-bi="${g.bi}">
+          <div class="blk-head">
+            ${nBlk>1?`<span class="drag-h" title="ドラッグして順番を変える" aria-hidden="true">⠿⠿</span>`:''}
+            <span class="blk-kind${b.blocked?' miss':''}">${b.blocked?'設備なし':BLOCK[b.type].ja}</span>
+            <span class="blk-desc">${MUSCLES[g.m].ja}${b.manual?'<span class="added-badge">手動追加</span>':''}${b.added?'<span class="added-badge">時間調整で追加</span>':''}${b.role?' ・ '+b.role:''}${b.tag?' ・ '+b.tag:''} ・ ${b.detail}</span>
+            ${nBlk>1?`<span class="ordbox">
+              <button class="ord-b" data-act="blk" data-di="${p.di}" data-bi="${g.bi}" data-dir="up" ${gi===0?'disabled':''} title="この種目（ブロック）を1つ前に">▲</button>
+              <button class="ord-b" data-act="blk" data-di="${p.di}" data-bi="${g.bi}" data-dir="down" ${gi===nBlk-1?'disabled':''} title="この種目（ブロック）を1つ後ろに">▼</button>
+            </span>`:''}
+            ${b.manual?`<button class="ord-b del" data-act="delmanual" data-di="${p.di}" data-bi="${g.bi}" title="この手動追加を削除">✕</button>`:''}
+          </div>
+          <div class="ex-list" data-di="${p.di}" data-bi="${g.bi}">
+          ${b.exs.map((ex,i)=>`
+            <div class="ex" data-orig="${(b.origIds&&b.origIds[i])||ex.id}">
+              ${b.exs.length>1?`<span class="drag-h-ex" title="ドラッグして順番を変える" aria-hidden="true">⠿</span>`:''}
+              <div class="ex-bar" style="background:${MUSCLES[ex.m].color}"></div>
+              <div class="ex-name">${ex.ja}${b.sigmark&&!(b.swapped&&b.swapped[i])?'<span class="sigmark">定番</span>':''}${b.swapped&&b.swapped[i]?'<span class="swapped">差し替え済み</span>':''}
+                <small>${ex.detail?`<b class="detail">${ex.detail}</b> ・ `:''}${ex.c?'コンパウンド':'アイソレーション'}${b.submax?' ・ 非限界（軽め・追い込まない）':''}${b.warmupSec?` ・ ウォームアップ約${Math.round(b.warmupSec/60)}分を含む`:''}${b.blocked&&!available(ex)?' ・ 必要な設備：'+reqMissing(ex).join('、'):''}</small></div>
+              <div class="ex-sets">${setLabel(b,i)}
+                <div class="wt-wrap">
+                  <input type="number" class="wt-input" min="0" step="0.5" placeholder="0"
+                    data-di="${p.di}" data-bi="${g.bi}" data-i="${i}"
+                    value="${weightOv[weightKey(method.id,wkIdx,p.di,g.bi,i)] ?? ''}">
+                  <span class="wt-unit">${ex.loadUnit==='pair'?'kg/片手':ex.loadUnit==='bw'?(bwKg?`加重kg<br>(体重${Math.round(bwKg*(BW_FRACTION[ex.id]??1))}kg込み)`:'加重kg'):'kg'}</span>
+                </div>
+                <small>${restLabel(b,i)}</small></div>
+              <div class="ex-acts">
+                ${b.exs.length>1?`
+                  <button class="ord-b sm" data-act="ex" data-di="${p.di}" data-bi="${g.bi}" data-orig="${(b.origIds&&b.origIds[i])||ex.id}" data-dir="up" ${i===0?'disabled':''} title="この種目を1つ前に">▲</button>
+                  <button class="ord-b sm" data-act="ex" data-di="${p.di}" data-bi="${g.bi}" data-orig="${(b.origIds&&b.origIds[i])||ex.id}" data-dir="down" ${i===b.exs.length-1?'disabled':''} title="この種目を1つ後ろに">▼</button>
+                `:''}
+                <button class="ex-swap${b.blocked&&!available(ex)?' alert':''}" data-key="${(b.keys&&b.keys[i])||''}" data-m="${ex.m}" data-cur="${ex.id}">差し替え</button>
+                ${b.exs.length===1?`<button class="ex-edit" data-act="edit" data-di="${p.di}" data-bi="${g.bi}" title="セット数・レップを編集">編集</button>`:''}
+                <button class="ex-vid${CLIP[ex.id]?' has-clip':''}" data-ex="${ex.id}" title="${CLIP[ex.id]?'解説動画あり：'+CLIP[ex.id][0].by:'解説動画は未登録'}">フォーム</button>
+              </div>
+            </div>`).join('')}
+          </div>
+          <div class="blk-foot">${b.blocked?'設備が足りないため、収支には数えていません。'
+            :`このブロック：実セット <b>${b.phys}</b> ・ 有効セット換算 <b>${rnd(b.eff)}</b> ・ 所要 <b>${Math.round(b.sec/60)}分</b>`}</div>
+        </div>`).join('')).join('')}
+      </div>
+      <button class="add-ex-btn" data-di="${p.di}">＋ 種目を追加</button>
+    </article>`;
+  }).join('');
+  const dragHint = ' ⠿をドラッグするか▲▼で、種目の順番を自分の好みに並び替えられます。「＋ 種目を追加」で種目を増やせます（時間・収支も再計算されます）。';
+  $('#menu').innerHTML=`<h2>週間メニュー<span>${wk.planLabel||method.ja}${method.by!=='—'?' / '+method.by:''}${wk.isPreset?' ・ プリセット':' ・ 自動生成'}</span></h2>`
+    + (wk.schedNote
+        ? `<p class="rotnote"><b>${wk.rot}種類のワークアウトを、週${rnd(wk.spw)}回で回します。</b>${wk.schedNote}。以下は<b>種類の一覧</b>であって、週の並びではありません。${dragHint}</p>`
+        : `<p class="rotnote">${dragHint}</p>`)
+    + html;
+  initDrag();
+}
+
+/* ---- ドラッグで並び替え（ポインターイベント方式：マウス・タッチ両対応） ---- */
+function initDrag(){
+  $('#menu').querySelectorAll('.drag-h').forEach(h=>{
+    h.addEventListener('pointerdown', ev=>startDrag(ev, h.closest('.blk'), h.closest('.blk-list'), '.blk', commitBlockOrder));
+  });
+  $('#menu').querySelectorAll('.drag-h-ex').forEach(h=>{
+    h.addEventListener('pointerdown', ev=>startDrag(ev, h.closest('.ex'), h.closest('.ex-list'), '.ex', commitExOrder));
+  });
+}
+function startDrag(ev, item, container, sel, onCommit){
+  if(!item || !container) return;
+  ev.preventDefault();
+  const rect = item.getBoundingClientRect();
+  const placeholder = document.createElement('div');
+  placeholder.className = 'drag-placeholder';
+  placeholder.style.height = rect.height+'px';
+  container.insertBefore(placeholder, item.nextSibling);
+
+  // 掴んだ位置と要素上端との差を保持し、指の真下ではなく自然な位置に浮かせる
+  const grabOffsetY = ev.clientY - rect.top;
+  item.style.position='fixed';
+  item.style.left=rect.left+'px';
+  item.style.top=rect.top+'px';
+  item.style.width=rect.width+'px';
+  item.classList.add('floating');
+  document.body.appendChild(item); // overflow:hidden な親から確実に浮かせる
+
+  function place(clientY){
+    item.style.top = (clientY - grabOffsetY)+'px';
+    const sibs = Array.from(container.children).filter(el=>el!==placeholder && el.matches(sel));
+    for(const sib of sibs){
+      const r = sib.getBoundingClientRect();
+      const mid = r.top + r.height/2;
+      const placeholderBeforeSib = !!(placeholder.compareDocumentPosition(sib) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if(clientY < mid && !placeholderBeforeSib){ container.insertBefore(placeholder, sib); break; }
+      if(clientY >= mid && placeholderBeforeSib){ container.insertBefore(placeholder, sib.nextSibling); break; }
+    }
+  }
+  function onMove(mv){ place(mv.clientY); }
+  function onUp(){
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    container.insertBefore(item, placeholder);
+    placeholder.remove();
+    item.style.position=''; item.style.left=''; item.style.top=''; item.style.width='';
+    item.classList.remove('floating');
+    onCommit(container, item);
+  }
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+}
+function commitBlockOrder(container){
+  if(!currentMethod) return;
+  const di = +container.dataset.di, wkIdx = +$('#week').value;
+  const order = Array.from(container.children).filter(el=>el.matches('.blk')).map(el=>el.dataset.bi);
+  blockOrder[dayKey(currentMethod.id, wkIdx, di)] = order;
+  render();
+}
+function commitExOrder(container){
+  if(!currentMethod) return;
+  const di = +container.dataset.di, bi = container.dataset.bi, wkIdx = +$('#week').value;
+  const order = Array.from(container.children).filter(el=>el.matches('.ex')).map(el=>el.dataset.orig);
+  exOrder[`${currentMethod.id}|${wkIdx}|${di}|${bi}`] = order;
+  render();
+}
+function setLabel(b,i){
+  const reps = b.gradedReps ? b.gradedReps[Math.min(i,b.gradedReps.length-1)] : b.reps;
+  if(b.type==='restpause') return `1本 &times; ${reps}`;
+  if(b.type==='round'||b.type==='drop') return `1 &times; ${reps}`;
+  return `${b.sets} &times; ${reps}`;
+}
+function restLabel(b,i){
+  if(b.type==='round') return i<b.exs.length-1?'休憩なし → 次の種目へ':`ラウンド間 ${b.rest}秒`;
+  if(b.type==='pair')  return i<b.exs.length-1?'休憩なし → 次の種目へ':`ペア後 ${b.rest}秒`;
+  if(b.type==='restpause') return `停止 ${b.pause}秒 ・ 本後 ${b.rest}秒`;
+  if(b.type==='drop')  return `段階間は休まない ・ 後 ${b.rest}秒`;
+  return `休憩 ${b.rest}秒`;
+}
+
+const AMIN=Math.min(...METHODS.map(m=>m.axis)), AMAX=Math.max(...METHODS.map(m=>m.axis));
+function drawPhil(method){
+  const sorted=[...METHODS].sort((a,b)=>a.axis-b.axis), pos={}; let last=-99;
+  sorted.forEach(m=>{let p=(m.axis-AMIN)/(AMAX-AMIN)*100; if(p-last<3.6)p=last+3.6; pos[m.id]=Math.min(p,100); last=pos[m.id];});
+  const p=pos[method.id];
+  const st = p<22?'left:0' : p>78?'right:0;text-align:right' : `left:${p}%;transform:translateX(-50%)`;
+  $('#axis').innerHTML=`<div class="axis-line"></div>
+    <div class="axis-end l">回復を優先<br>刺激は最小限でいい</div>
+    <div class="axis-end r">刺激を優先<br>量そのものが刺激</div>
+    ${METHODS.map(m=>`<button class="axis-dot${m.id===method.id?' on':''}" style="left:${pos[m.id]}%" data-mid="${m.id}" title="${m.ja}" aria-label="${m.ja}に切り替え"></button>`).join('')}
+    <div class="axis-tag" style="${st}">${method.short}<small>${method.by!=='—'?method.by:''}</small></div>`;
+  const ph=PHIL[method.id];
+  $('#philSel').innerHTML=`<span class="who">選択中 ・ ${method.by}${ph.era!=='—'?' ・ '+ph.era:''}</span><h5>${method.ja}</h5><p>${ph.text}</p>${ph.enemy!=='—'?`<div class="enemy">削るべき無駄と見なすもの：<b>${ph.enemy}</b></div>`:''}`;
+}
+$('#axis').addEventListener('click',ev=>{const d=ev.target.closest('.axis-dot');if(!d)return;$('#method').value=d.dataset.mid;render();});
+
+function drawFoot(){
+  $('#foot').innerHTML=`<b>このプロトタイプについて。</b> 部位別の要求量は「部位あたり週10〜20セット」という一般的な目安をもとに置いた<b>仮の値</b>です。ブロックの有効セット換算係数（レストポーズ×2.6 など）も<b>推定であり、一次情報の裏付けはありません</b>——この係数を動かせば判定は簡単に反転します。プリセットは各考案者が<b>好んで用いたとされる種目と構成を再現したものですが、本人が公表した特定のルーティンの逐語的な再現ではありません</b>。日数や部位配分は、このツールの枠に合わせて調整しています。「思想の座標」の文章も立場の要約であり、本人の発言の引用ではありません。解説動画は<b>種目ごとに手作業で登録したものだけ</b>が表示され、登録が無い種目のボタンは空のままです（現在の登録：レッグカール1件）。動画から抜き出したコツは<b>その動画で実際に述べられている内容に限り</b>、こちらの一般論による補足は加えていません。ただし<b>それが正しいかどうかは別の話で、内容の妥当性は保証しません</b>。`;
+}
+
+/* ---- 重量(kg)の入力。標準・プリセット共通、全種目で使える。
+   タイピング中に再描画すると入力欄からフォーカスが外れるため、'change'（確定時）だけで反映する。 ---- */
+$('#menu').addEventListener('change', ev=>{
+  const inp = ev.target.closest('.wt-input'); if(!inp || !currentMethod) return;
+  const di=+inp.dataset.di, bi=inp.dataset.bi, i=+inp.dataset.i;
+  const key = weightKey(currentMethod.id, +$('#week').value, di, bi, i);
+  const v = inp.value.trim();
+  if(v==='') delete weightOv[key]; else weightOv[key] = parseFloat(v);
+  render();
+});
+
+/* ---- セット・レップ・インターバルの手動編集 ---- */
+let editTarget = null;
+$('#menu').addEventListener('click',ev=>{
+  const b=ev.target.closest('.ex-edit'); if(!b) return;
+  const di=+b.dataset.di, biStr=b.dataset.bi;
+  if(!currentWk || !currentMethod) return;
+  const day = currentWk.plans[di]; if(!day) return;
+  const grp = day.groups.find(g=>g.bi===biStr); if(!grp) return;
+  const blk = grp.blocks[0];
+  editTarget = {mid:currentMethod.id, wk:+$('#week').value, di, bi:biStr};
+  $('#eTitle').textContent = blk.exs[0].ja;
+  $('#eSub').textContent = `${MUSCLES[grp.m].ja} ・ ${BLOCK[blk.type].ja}`;
+  $('#eSetsField').classList.toggle('hide', blk.type!=='straight');
+  $('#eSets').value = blk.sets || '';
+  $('#eReps').value = blk.reps || '';
+  $('#eRest').value = blk.rest ?? '';
+  $('#editModal').classList.add('on');
+});
+$('#eSave').addEventListener('click',()=>{
+  if(!editTarget) return;
+  const key = srKey(editTarget.mid, editTarget.wk, editTarget.di, editTarget.bi);
+  const setsVal = $('#eSets').value ? +$('#eSets').value : null;
+  const repsVal = $('#eReps').value || null;
+  const restVal = $('#eRest').value ? +$('#eRest').value : null;
+  setsRepsOv[key] = {sets:setsVal, reps:repsVal, rest:restVal};
+  $('#editModal').classList.remove('on'); editTarget=null; render();
+});
+$('#eReset').addEventListener('click',()=>{
+  if(!editTarget) return;
+  delete setsRepsOv[srKey(editTarget.mid, editTarget.wk, editTarget.di, editTarget.bi)];
+  $('#editModal').classList.remove('on'); editTarget=null; render();
+});
+$('#eClose').addEventListener('click',()=>{$('#editModal').classList.remove('on');});
+$('#editModal').addEventListener('click',e=>{if(e.target.id==='editModal')$('#editModal').classList.remove('on');});
+
+/* ---- 並び替え・手動追加の削除 ---- */
+$('#menu').addEventListener('click',ev=>{
+  const b=ev.target.closest('.ord-b'); if(!b||b.disabled||!currentWk||!currentMethod) return;
+  const di=+b.dataset.di, mid=currentMethod.id, wkIdx=+$('#week').value;
+  const day = currentWk.plans[di]; if(!day) return;
+
+  if(b.dataset.act==='delmanual'){
+    const bi=b.dataset.bi, m=bi.match(/^manual(\d+)$/);
+    if(m){
+      const key=dayKey(mid,wkIdx,di), idx=+m[1];
+      if(manualAdds[key]) manualAdds[key].splice(idx,1);
+      // 添え字がずれるので、この日の並び替え・編集情報は一度リセットする
+      delete blockOrder[dayKey(mid,wkIdx,di)];
+      const prefix = `${mid}|${wkIdx}|${di}|manual`;
+      Object.keys(setsRepsOv).forEach(k=>{ if(k.startsWith(prefix)) delete setsRepsOv[k]; });
+      Object.keys(weightOv).forEach(k=>{ if(k.startsWith(prefix)) delete weightOv[k]; });
+    }
+    render(); return;
+  }
+
+  const dir=b.dataset.dir;
+  if(b.dataset.act==='blk'){
+    const bi=b.dataset.bi;
+    const order = day.groups.map(g=>g.bi);
+    const idx = order.indexOf(bi), swapIdx = idx + (dir==='up'?-1:1);
+    if(swapIdx<0||swapIdx>=order.length) return;
+    [order[idx],order[swapIdx]] = [order[swapIdx],order[idx]];
+    blockOrder[dayKey(mid,wkIdx,di)] = order;
+  } else {
+    const bi=b.dataset.bi, orig=b.dataset.orig;
+    const grp = day.groups.find(g=>g.bi===bi); if(!grp) return;
+    const blk = grp.blocks[0];
+    const order = (blk.origIds && blk.origIds.length ? blk.origIds : blk.exs.map(e=>e.id)).slice();
+    const idx = order.indexOf(orig), swapIdx = idx + (dir==='up'?-1:1);
+    if(idx<0||swapIdx<0||swapIdx>=order.length) return;
+    [order[idx],order[swapIdx]] = [order[swapIdx],order[idx]];
+    exOrder[`${mid}|${wkIdx}|${di}|${bi}`] = order;
+  }
+  render();
+});
+
+/* ---- 種目の差し替え・スキップ ---- */
+const CAT = e => e.c ? 'compound' : e.str ? 'stretch' : e.pmp ? 'pump' : 'iso';
+const CATJA = {compound:'コンパウンド', stretch:'ストレッチ種目', pump:'パンプ種目', iso:'アイソレーション'};
+let swapKey=null;
+$('#menu').addEventListener('click',ev=>{
+  const b=ev.target.closest('.ex-swap'); if(!b) return;
+  openSwap(b.dataset.key, b.dataset.m, b.dataset.cur);
+});
+function openSwap(key, m, curId){
+  if(!key) return;
+  swapKey = key;
+  const cur = EXBY[curId];
+  const curCat = CAT(cur);
+  const cands = EX.filter(e=>e.m===m && available(e) && e.id!==curId)
+    .sort((a,b)=>(CAT(a)===curCat?0:1)-(CAT(b)===curCat?0:1));
+  $('#sSub').textContent = `${MUSCLES[m].ja} ・ 現在は「${cur.ja}」`;
+  $('#sHead').innerHTML = available(cur)
+    ? `セット数・レップ・休憩はそのまま、種目だけ入れ替えます。同じ性質（${CATJA[curCat]}）の種目を上に並べています。`
+    : `<b>この種目は今の設備では実行できません。</b>下から代わりの種目を選ぶか、スキップしてください。セット数・レップ・休憩はそのまま引き継がれます。`;
+  $('#sList').innerHTML =
+    `<button data-pick="__reset">元に戻す（${cur.ja}）<small>プリセットの指定</small></button>` +
+    `<button data-pick="__skip">この種目をスキップする<small>収支から除外されます</small></button>` +
+    cands.map(e=>`<button data-pick="${e.id}">${e.ja}<small>${CATJA[CAT(e)]}${CAT(e)===curCat?' ・ 同じ性質':''}</small></button>`).join('') +
+    (cands.length?'':`<button disabled>現在の設備では代替種目がありません<small>02で設備を追加してください</small></button>`);
+  $('#swapModal').classList.add('on');
+}
+$('#sList').addEventListener('click',ev=>{
+  const b=ev.target.closest('button[data-pick]'); if(!b||!swapKey) return;
+  const v=b.dataset.pick;
+  if(v==='__reset') delete overrides[swapKey];
+  else if(v==='__skip') overrides[swapKey]='skip';
+  else overrides[swapKey]=v;
+  $('#swapModal').classList.remove('on'); swapKey=null; render();
+});
+$('#sClose').addEventListener('click',()=>{$('#swapModal').classList.remove('on');});
+$('#swapModal').addEventListener('click',e=>{if(e.target.id==='swapModal')$('#swapModal').classList.remove('on');});
+$('#resetSwap').addEventListener('click',()=>{overrides={};blockOrder={};exOrder={};manualAdds={};setsRepsOv={};weightOv={};render();});
+
+/* ---- 種目の手動追加 ---- */
+let addDi = null;
+$('#menu').addEventListener('click',ev=>{
+  const b = ev.target.closest('.add-ex-btn'); if(!b) return;
+  openAdd(+b.dataset.di);
+});
+function openAdd(di){
+  addDi = di;
+  $('#aSub').textContent = (currentWk && currentWk.plans[di]) ? currentWk.plans[di].day.ja : '—';
+  $('#aMuscle').innerHTML = MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('');
+  $('#aMuscle').onchange = renderAddList;
+  renderAddList();
+  $('#addModal').classList.add('on');
+}
+function renderAddList(){
+  const m = $('#aMuscle').value;
+  const cands = EX.filter(e=>e.m===m && available(e));
+  $('#aList').innerHTML = cands.length
+    ? cands.map(e=>`<button data-add="${e.id}">${e.ja}<small>${e.detail?e.detail+' ・ ':''}${e.c?'コンパウンド':'アイソレーション'}</small></button>`).join('')
+    : `<button disabled>この部位で使える種目が、選んだ設備の中にありません<small>02で設備を追加してください</small></button>`;
+}
+$('#aList').addEventListener('click',ev=>{
+  const b = ev.target.closest('button[data-add]'); if(!b || addDi===null) return;
+  const exId = b.dataset.add, ex = EXBY[exId];
+  const key = dayKey(currentMethod.id, +$('#week').value, addDi);
+  if(!manualAdds[key]) manualAdds[key] = [];
+  manualAdds[key].push({exId, sets:3, reps: ex.c?'6–10':'10–12'});
+  $('#addModal').classList.remove('on'); addDi=null; render();
+});
+$('#aClose').addEventListener('click',()=>{$('#addModal').classList.remove('on');});
+$('#addModal').addEventListener('click',e=>{if(e.target.id==='addModal')$('#addModal').classList.remove('on');});
+
+/* 動画モーダル */
+let current=null;
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+$('#menu').addEventListener('click',ev=>{const b=ev.target.closest('.ex-vid');if(!b)return;openModal(EXBY[b.dataset.ex]);});
+let currentClip=null;
+/* 動画IDと秒数からURLを組み立てる。データ側に完成URLを持たせない方針のため、
+   組み立てはここ1箇所に集約する。 */
+const ytEmbed=(vid,t,auto)=>`https://www.youtube.com/embed/${vid}?start=${t}${auto?'&autoplay=1':''}`;
+const ytWatch=(vid,t)=>`https://www.youtube.com/watch?v=${vid}&t=${t}s`;
+
+function playAt(vid,t,auto,title){
+  $('#mFrame').innerHTML=`<iframe src="${ytEmbed(vid,t,auto)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${title}"></iframe>`;
+  $('#mFallback').innerHTML=`<span>埋め込みが再生できない場合</span><a href="${ytWatch(vid,t)}" target="_blank" rel="noopener">YouTubeで直接開く ↗</a>`;
+}
+function markOn(t){
+  $('#mMarks').querySelectorAll('.mark-b').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));
+}
+
+function openModal(ex){
+  current=ex;
+  const clip = (CLIP[ex.id]||[])[0] || null;
+  currentClip = clip;
+  $('#mTitle').textContent=ex.ja;
+  $('#mVid').value='';
+
+  if(clip){
+    const t0 = clip.marks[0].t;
+    $('#mSub').textContent=`${MUSCLES[ex.m].ja} ・ ${clip.by}`;
+    playAt(clip.vid, t0, false, clip.title);
+    $('#mMarks').innerHTML=`<div class="marks-h">この場面から再生</div>`+
+      clip.marks.map(m=>`<button class="mark-b${m.t===t0?' on':''}" data-t="${m.t}"><span class="tc">${fmt(m.t)}</span>${m.ja}</button>`).join('');
+    $('#mCues').innerHTML=`<p class="clip-lead">${clip.lead}</p>`+
+      `<div class="cue-block"><h5>コツ</h5><ul>${clip.cues.map(c=>`<li>${c}</li>`).join('')}</ul></div>`+
+      ((clip.ng&&clip.ng.length)?`<div class="cue-block ng"><h5>やってはいけない</h5><ul>${clip.ng.map(c=>`<li>${c}</li>`).join('')}</ul></div>`:'')+
+      `<p class="clip-note">出典：${clip.title}／${clip.by}。ここに書いてあるのは動画内で述べられている内容だけで、こちらの一般論による補足は加えていません。</p>`;
+    $('#mKv').innerHTML=`<div><b>種目ID</b><code>${ex.id}</code></div>
+      <div><b>動画ID</b><code>${clip.vid}</code></div>
+      <div><b>YouTubeで開く</b><code><a href="${ytWatch(clip.vid,t0)}" target="_blank" rel="noopener">${ytWatch(clip.vid,t0)}</a></code></div>`;
+  }else{
+    $('#mSub').textContent=`${MUSCLES[ex.m].ja} ・ 想定タイムスタンプ ${fmt(ex.start)}`;
+    $('#mFrame').innerHTML=`<div class="ph">この種目の解説動画はまだ登録されていません。<br>YouTubeの動画IDを貼ると、<b>${fmt(ex.start)}</b> から再生します。</div>`;
+    $('#mMarks').innerHTML='';
+    $('#mCues').innerHTML='';
+    $('#mFallback').innerHTML='';
+    $('#mKv').innerHTML=`<div><b>種目ID</b><code>${ex.id}</code></div><div><b>動画ID</b><code>未設定</code></div>
+      <div><b>開始秒</b><code>${ex.start}</code></div>
+      <div><b>生成URL</b><code>https://www.youtube.com/embed/{VIDEO_ID}?start=${ex.start}&amp;autoplay=1</code></div>`;
+  }
+  $('#mPlayRow').className = clip ? 'play-row alt' : 'play-row';
+  $('#mVid').placeholder = clip ? '別の動画IDを貼ると差し替えて再生' : 'YouTubeの動画ID';
+  $('#modal').classList.add('on');
+}
+
+/* 章の頭出し */
+$('#mMarks').addEventListener('click',ev=>{
+  const b=ev.target.closest('.mark-b'); if(!b||!currentClip) return;
+  const t=+b.dataset.t;
+  playAt(currentClip.vid,t,true,currentClip.title);
+  markOn(t);
+  const link=$('#mKv').querySelector('a');
+  if(link){link.href=ytWatch(currentClip.vid,t);link.textContent=ytWatch(currentClip.vid,t);}
+});
+
+$('#mPlay').addEventListener('click',()=>{const raw=$('#mVid').value.trim();if(!raw||!current)return;
+  const id=(raw.match(/[\w-]{11}/)||[raw])[0];
+  const t=currentClip?currentClip.marks[0].t:current.start;
+  playAt(id,t,true,current.ja);
+  markOn(-1);
+  $('#mKv').querySelectorAll('code')[1].textContent=id;});
+$('#mClose').addEventListener('click',close_);
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')close_();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){close_();$('#swapModal').classList.remove('on');}});
+function close_(){$('#modal').classList.remove('on');$('#mFrame').innerHTML='';currentClip=null;}
+
+/* ============================================================
+   7. PDF出力（印刷ダイアログ経由）
+   往年のジム記録カード（氏名・性別・日付欄＋番号付き種目表＋部位の縦書きラベル）
+   というフォーマットを踏襲し、中身は現在組んだメニューを差し込む。
+   実在の施設名・人物名は使わない。
+   ============================================================ */
+function buildPrintCards(){
+  if(!currentWk || !currentMethod) return '';
+  const wk = currentWk, method = currentMethod;
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}`;
+  const titleJa = wk.planLabel || method.ja;
+  const nDays = wk.plans.length;
+  // 日数に応じて列数を決める（横に並べて1枚に収める。多い場合は列を折り返す）
+  const cols = nDays<=3 ? nDays : nDays<=6 ? Math.ceil(nDays/2) : Math.ceil(nDays/3);
+
+  const dayCols = wk.plans.map((p,di)=>{
+    const dayLabel = wk.isPreset ? String.fromCharCode(65+di) : String(di+1);
+    let rowNo = 0;
+    const rows = [];
+    p.groups.forEach(g=>g.blocks.forEach(b=>{
+      if(b.blocked) return;
+      b.exs.forEach((ex,i)=>{
+        rowNo++;
+        const reps = (b.gradedReps ? b.gradedReps[Math.min(i,b.gradedReps.length-1)] : b.reps) || '';
+        const setsLabel = b.type==='round' ? '1' : b.type==='restpause' ? '1本' : b.type==='drop' ? '1' : String(b.sets||'');
+        const wt = weightOv[weightKey(method.id, +$('#week').value, di, g.bi, i)];
+        const wtLabel = wt!=null ? wt+(ex.loadUnit==='pair'?'/片手':ex.loadUnit==='bw'?'(加重)':'') : '';
+        rows.push(`<tr>
+          <td class="no">${rowNo}</td>
+          <td class="name"><b>${ex.ja}</b>${ex.detail?`<small>${ex.detail}</small>`:''}</td>
+          <td class="num">${setsLabel}</td>
+          <td class="blank">${wtLabel}</td>
+          <td class="num">${reps}</td>
+        </tr>`);
+      });
+    }));
+    return `<div class="day-col">
+      <div class="day-col-head"><span class="lbl">DAY ${dayLabel}</span><span>${p.day.ja}</span></div>
+      <table class="dc-table">
+        <thead><tr><th style="width:14px">No</th><th>EXERCISE</th><th style="width:30px">SETS</th><th style="width:34px">LBS</th><th style="width:30px">TIMES</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  return `<div class="sheet-page" id="sheetPage">
+    <div class="card-head">
+      <div class="cn">週間トレーニングカード</div>
+      <div class="en">WEEKLY TRAINING CARD</div>
+      <div class="sub">${titleJa}${method.by!=='—'?'（'+method.by+'）':''}
+        <span class="cn2">ALL ${nDays} DAYS / 1 SHEET</span></div>
+      <div class="card-datebox">DATE</div>
+    </div>
+    <div class="card-fields">
+      <div><b>氏名</b>Name <span class="line"></span></div>
+      <div><b>性別</b>Sex <span class="line" style="min-width:36px"></span></div>
+      <div><b>日付</b>Date <span class="line">${dateStr}</span></div>
+    </div>
+    <div class="week-grid" style="grid-template-columns:repeat(${cols},1fr)">${dayCols}</div>
+    <div class="card-foot">LBS column reflects weight entered in the app (per-hand for paired dumbbells, added weight for bodyweight moves). Blank = fill in by hand.</div>
+  </div>`;
+}
+$('#pdfBtn').addEventListener('click',()=>{
+  const html = buildPrintCards();
+  if(!html){ return; }
+  $('#printArea').innerHTML = html;
+  // 全日程を1枚に収めるため、実際の内容量に応じてズームを自動調整する。
+  // A4横 297mm から左右余白8mm×2を引いた印刷可能領域を、96dpiのpx換算で見積もる。
+  requestAnimationFrame(()=>{
+    const page = document.getElementById('sheetPage');
+    if(page){
+      page.style.zoom = 1;
+      const availableHeightPx = (210 - 8*2) * (96/25.4); // A4横の短辺（高さ）190mm相当
+      const contentHeightPx = page.scrollHeight;
+      const scale = Math.min(1, availableHeightPx / contentHeightPx);
+      if(scale < 1) page.style.zoom = Math.max(0.45, scale);
+    }
+    setTimeout(()=>{ window.print(); }, 60);
+  });
+});
+
+/* ---- 隠しコマンド：プロボディビルダーのプリセットを解放する ----
+   ↑↑↓↓←→←→BA（コナミコマンド、物理キーボードのある環境向け）。
+   スマホなど矢印キーが無い環境向けに、見出しを7回連続タップする方式も併設する。
+   一般トレーニーには複雑すぎるため、既定では隠している。
+   解放状態はこのページを開いている間だけ保持され、再読み込みで元に戻る。 */
+function unlockPro(){
+  if(proUnlocked) return;
+  proUnlocked = true;
+  paintMethodOptions();
+  showToast('プロボディビルダーのメニューを解放しました');
+}
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let konamiPos = 0;
+document.addEventListener('keydown', ev=>{
+  const key = ev.key.length===1 ? ev.key.toLowerCase() : ev.key;
+  konamiPos = (key === KONAMI[konamiPos]) ? konamiPos+1 : (key===KONAMI[0] ? 1 : 0);
+  if(konamiPos === KONAMI.length){ konamiPos = 0; unlockPro(); }
+});
+let tapCount = 0, tapTimer = null;
+$('#tapZone').addEventListener('click', ()=>{
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(()=>{ tapCount = 0; }, 1800);
+  if(tapCount >= 7){ tapCount = 0; unlockPro(); }
+});
+
+/* 格言エリアのタップ操作：
+   ダブルタップ → 別の格言にシャッフル（標準メニューのときのみ）
+   トリプルタップ → プロボディビルダーのメニューを解放（スマホ向けの隠しコマンド）
+   一定時間待ってからタップ数を判定するので、2回と3回を取り違えない。 */
+let qTap = 0, qTimer = null;
+function onQuoteTap(){
+  qTap++;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(()=>{
+    if(qTap >= 3){
+      unlockPro();
+    } else if(qTap === 2){
+      const cur = $('#method').value;
+      if(cur === 'std'){
+        let next = memeIdx;
+        while(next === memeIdx && MEMES.length > 1) next = Math.floor(Math.random()*MEMES.length);
+        memeIdx = next;
+        setCredo(METHODS.find(m=>m.id==='std'));
+      }
+    }
+    qTap = 0;
+  }, 420);
+}
+$('#headline').addEventListener('click', onQuoteTap);
+$('#attrib').addEventListener('click', onQuoteTap);
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=> t.classList.add('on'));
+  setTimeout(()=>{ t.classList.remove('on'); setTimeout(()=>t.remove(), 400); }, 2600);
+}
+
+/* ============================================================
+   6.5 設定の保存（書き出し／読み込み／自動保存）
+   アプリのコードは公開先（GitHub Pagesなど）を更新すれば全員に反映されるが、
+   利用者ごとの個人設定（体重・身長・目標、差し替えた種目、重量の記録など）は
+   各自のブラウザ／端末にしかない。ここではその個人設定だけを扱う。
+   SAVE_SCHEMA_VERSION は保存データの形式のバージョン。
+   アプリを更新して保存データの構造が変わっても、古いバージョンの
+   ファイルを読み込んだときに壊れず「読める分だけ読む」ようにするための目印。 */
+const SAVE_SCHEMA_VERSION = 1;
+const LOCAL_KEY = 'workoutMenuAppState';
+
+function collectState(){
+  return {
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    savedAt: new Date().toISOString(),
+    equipment: [...selected],
+    proUnlocked,
+    method: $('#method').value,
+    week: $('#week').value,
+    days: $('#days').value,
+    mins: $('#mins').value,
+    rest: $('#rest').value,
+    goal: $('#goal').value,
+    autoFit: $('#autoFit').checked,
+    bSex: $('#bSex').value,
+    bWeight: $('#bWeight').value,
+    bHeight: $('#bHeight').value,
+    overrides, blockOrder, exOrder, manualAdds, setsRepsOv, weightOv
+  };
+}
+/* strict=false（自動保存の復元）のときは静かに読み込む。
+   strict=true（ファイル読み込み）のときは、成功・失敗をUIに返す。 */
+function applyState(data, strict){
+  if(!data || typeof data!=='object') return {ok:false, msg:'ファイルの形式が正しくありません。'};
+  const verMismatch = data.schemaVersion !== SAVE_SCHEMA_VERSION;
+
+  if(Array.isArray(data.equipment) && data.equipment.length) selected = new Set(data.equipment);
+  if(data.proUnlocked) proUnlocked = true;
+  paintMethodOptions(); paintEquip();
+
+  const setIf = (id,val) => { if(val!=null && val!=='') { const el=$('#'+id); if(el) el.value = val; } };
+  setIf('method', data.method); // 手法一覧を描画した後でないと存在しない選択肢がある
+  setIf('week', data.week); setIf('days', data.days); setIf('mins', data.mins);
+  setIf('rest', data.rest); setIf('goal', data.goal);
+  if(typeof data.autoFit==='boolean') $('#autoFit').checked = data.autoFit;
+  setIf('bSex', data.bSex); setIf('bWeight', data.bWeight); setIf('bHeight', data.bHeight);
+
+  overrides   = (data.overrides   && typeof data.overrides==='object')   ? data.overrides   : {};
+  blockOrder  = (data.blockOrder  && typeof data.blockOrder==='object')  ? data.blockOrder  : {};
+  exOrder     = (data.exOrder     && typeof data.exOrder==='object')     ? data.exOrder     : {};
+  manualAdds  = (data.manualAdds  && typeof data.manualAdds==='object')  ? data.manualAdds  : {};
+  setsRepsOv  = (data.setsRepsOv  && typeof data.setsRepsOv==='object')  ? data.setsRepsOv  : {};
+  weightOv    = (data.weightOv    && typeof data.weightOv==='object')    ? data.weightOv    : {};
+
+  render();
+  return {ok:true, msg: verMismatch
+    ? 'アプリの更新により保存形式が変わっているため、一部の設定は引き継げていない可能性があります。'
+    : '設定を読み込みました。'};
+}
+function saveToLocal(){
+  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(collectState())); }catch(e){ /* プライベートブラウズ等で失敗しても無視 */ }
+}
+function loadFromLocal(){
+  try{
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if(!raw) return false;
+    applyState(JSON.parse(raw), false);
+    return true;
+  }catch(e){ return false; }
+}
+$('#exportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(collectState(), null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date(); const pad=n=>String(n).padStart(2,'0');
+  a.href = url;
+  a.download = `workout-settings-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  $('#saveHint').textContent = 'ファイルを保存しました。他の端末では「設定を読み込む」からこのファイルを選んでください。';
+});
+$('#importBtn').addEventListener('click', ()=> $('#importFile').click());
+$('#importFile').addEventListener('change', ev=>{
+  const file = ev.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(e){ $('#saveHint').textContent = '読み込めませんでした。ファイルが壊れているか、対応していない形式です。'; return; }
+    const r = applyState(data, true);
+    $('#saveHint').textContent = r.msg;
+    saveToLocal();
+  };
+  reader.onerror = () => { $('#saveHint').textContent = 'ファイルの読み込み中にエラーが発生しました。'; };
+  reader.readAsText(file);
+  ev.target.value = '';
+});
+
+// 保存された設定があれば復元（内部でrenderも呼ぶ）。なければ通常どおり初期表示する。
+if(!loadFromLocal()) render();
+</script>
+</body>
+</html>
