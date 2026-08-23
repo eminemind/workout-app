@@ -507,6 +507,9 @@ input[type=number],input[type=text]{padding:8px 9px}
   width:100%;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--rule);
   padding:12px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink)}
 #dayPickList button:last-child{border-bottom:0}
+#dayPickList button.resume-btn{background:var(--ink);color:var(--on-dark);border-bottom:0;margin-bottom:6px;border-radius:var(--radius-sm)}
+#dayPickList button.resume-btn small{color:var(--on-dark);opacity:.75}
+#dayPickList button.resume-btn:hover{opacity:.9;background:var(--ink)}
 #dayPickList button:hover:not(:disabled){background:var(--surface-2)}
 #dayPickList button:disabled{opacity:.4;cursor:not-allowed}
 #dayPickList button small{color:var(--muted);font-weight:500}
@@ -534,8 +537,9 @@ input[type=number],input[type=text]{padding:8px 9px}
 .exec-ring-big{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 900;font-size:52px;line-height:1}
 .exec-ring-label{font-size:12px;color:var(--muted);font-weight:700}
 .exec-controls{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:52px}
-.exec-tap{width:84px;height:84px;border-radius:50%;background:var(--ink);color:var(--on-dark);
-  border:0;font-size:15px;font-weight:800;cursor:pointer;box-shadow:var(--shadow-soft)}
+.exec-tap{width:128px;height:128px;border-radius:50%;background:var(--ink);color:var(--on-dark);
+  border:0;font-size:16px;line-height:1.3;font-weight:800;cursor:pointer;box-shadow:var(--shadow-soft);
+  display:flex;align-items:center;justify-content:center}
 .exec-tap:active{transform:scale(.96)}
 .exec-adj{background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);
   padding:9px 16px;font-size:13px;cursor:pointer;color:var(--ink);font-weight:700}
@@ -2839,7 +2843,7 @@ $('#importFile').addEventListener('change', ev=>{
    時間ベースの種目（プランク等、reps文字列に「秒」を含む）はレップの
    代わりに秒数カウントダウンにする。
    ============================================================ */
-let execSteps = [], execIdx = 0, execRepCount = 0, execTimerId = null, execSecLeft = 0, execSecTotal = 0;
+let execSteps = [], execIdx = 0, execTimerId = null, execSecLeft = 0, execSecTotal = 0;
 
 function parseSecFromReps(str){
   const m = str && String(str).match(/(\d+)\s*秒/);
@@ -2971,52 +2975,73 @@ function execRenderStep(){
       if(execSecLeft<=0){ execStopTimer(); beep(); }
     }, 1000);
   } else {
+    // レップを1回ずつ数えるのではなく、セット単位で「完了」を押して進める
     const target = Math.max(1, Math.round(repsMidpoint(step.reps) ?? 8));
-    execRepCount = 0;
-    $('#execBig').textContent = '0';
-    $('#execLabel').textContent = `目標 ${target} 回`;
-    execRingSet(0,false);
-    $('#execControls').innerHTML = `<button class="exec-tap" id="execTapBtn">+1</button><button class="exec-adj" id="execUndoBtn">戻す</button>`;
-    $('#execTapBtn').onclick = ()=>{
-      execRepCount++;
-      $('#execBig').textContent = execRepCount;
-      execRingSet(execRepCount/target, false);
-      if(execRepCount>=target) setTimeout(execNext, 250);
-    };
-    $('#execUndoBtn').onclick = ()=>{
-      execRepCount = Math.max(0, execRepCount-1);
-      $('#execBig').textContent = execRepCount;
-      execRingSet(execRepCount/target, false);
-    };
+    $('#execBig').textContent = target;
+    $('#execLabel').textContent = '回・目安';
+    execRingSet(1,false);
+    $('#execControls').innerHTML = `<button class="exec-tap" id="execSetDoneBtn">セット<br>完了</button>`;
+    $('#execSetDoneBtn').onclick = ()=> execNext();
   }
 }
 
-function execNext(){ if(execIdx < execSteps.length-1) execIdx++; execRenderStep(); }
-function execPrev(){ if(execIdx>0) execIdx--; execRenderStep(); }
+/* 実行の進み具合（どの日の何手順目か）をlocalStorageに一時保存する。
+   閉じる（戻る）を押しても消えず、次に「スタート」を押した時に
+   「続きから再開する」として選べる。手法・週が変わったら別物とみなす。 */
+const EXEC_KEY = 'workoutExecProgress';
+let execDi = null;
+function saveExecProgress(){
+  if(execDi==null || !currentMethod) return;
+  try{ localStorage.setItem(EXEC_KEY, JSON.stringify({methodId:currentMethod.id, week:+$('#week').value, di:execDi, idx:execIdx})); }catch(e){}
+}
+function clearExecProgress(){ try{ localStorage.removeItem(EXEC_KEY); }catch(e){} }
+function loadExecProgress(){
+  try{ const raw = localStorage.getItem(EXEC_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
 
-function execOpen(di){
+function execNext(){
+  if(execIdx < execSteps.length-1) execIdx++;
+  execRenderStep();
+  if(execSteps[execIdx].kind==='done') clearExecProgress(); else saveExecProgress();
+}
+function execPrev(){ if(execIdx>0) execIdx--; execRenderStep(); saveExecProgress(); }
+
+function execOpen(di, resumeIdx){
   const day = currentWk && currentWk.plans[di];
   if(!day) return;
   execSteps = buildExecSteps(day);
-  execIdx = 0;
+  execDi = di;
+  execIdx = (resumeIdx!=null && resumeIdx < execSteps.length-1) ? resumeIdx : 0;
   $('#execDayLabel').textContent = day.day.ja;
   $('#dayPickModal').classList.remove('on');
   $('#execView').classList.add('on');
   execRenderStep();
+  saveExecProgress();
 }
-function execClose(){ execStopTimer(); $('#execView').classList.remove('on'); }
+function execClose(){ execStopTimer(); $('#execView').classList.remove('on'); saveExecProgress(); }
 
 $('#startBtn').addEventListener('click', ()=>{
-  if(!currentWk) return;
-  $('#dayPickList').innerHTML = currentWk.plans.map((p,di)=>{
+  if(!currentWk || !currentMethod) return;
+  const saved = loadExecProgress();
+  const canResume = saved && saved.methodId===currentMethod.id && saved.week===+$('#week').value && currentWk.plans[saved.di];
+  let html = '';
+  if(canResume){
+    const day = currentWk.plans[saved.di];
+    const steps = buildExecSteps(day);
+    if(saved.idx < steps.length-1){
+      html += `<button data-di="${saved.di}" data-idx="${saved.idx}" class="resume-btn"><span>▶ 続きから再開する（${day.day.ja}）</span><small>${saved.idx+1} / ${steps.length-1}</small></button>`;
+    }
+  }
+  html += currentWk.plans.map((p,di)=>{
     const n = p.groups.filter(g=>!g.blocks[0].blocked).length;
     return `<button data-di="${di}" ${n===0?'disabled':''}><span>${p.day.ja}</span><small>${n}種目</small></button>`;
   }).join('');
+  $('#dayPickList').innerHTML = html;
   $('#dayPickModal').classList.add('on');
 });
 $('#dayPickList').addEventListener('click', ev=>{
   const b = ev.target.closest('button[data-di]'); if(!b || b.disabled) return;
-  execOpen(+b.dataset.di);
+  execOpen(+b.dataset.di, b.dataset.idx!=null ? +b.dataset.idx : undefined);
 });
 $('#dayPickClose').addEventListener('click', ()=> $('#dayPickModal').classList.remove('on'));
 $('#dayPickModal').addEventListener('click', e=>{ if(e.target.id==='dayPickModal') $('#dayPickModal').classList.remove('on'); });
