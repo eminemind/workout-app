@@ -503,6 +503,19 @@ input[type=number],input[type=text]{padding:8px 9px}
   padding:16px 22px;font-weight:800;font-size:15px;cursor:pointer;border-radius:var(--radius-pill);
   box-shadow:var(--shadow-soft)}
 .start-btn:hover{opacity:.9}
+.start-btn.outline{background:var(--surface-2);color:var(--ink);border:1px solid var(--rule);box-shadow:none}
+.hist-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.hist-summary div{background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:10px;text-align:center}
+.hist-summary b{display:block;font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 900;font-size:20px}
+.hist-summary span{font-size:10.5px;color:var(--muted)}
+.hist-mrow{display:grid;grid-template-columns:56px 1fr 40px;gap:8px;align-items:center;font-size:12px;margin-bottom:8px}
+.hist-mtrack{height:16px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);position:relative;overflow:hidden}
+.hist-mfill{height:100%;border-radius:var(--radius-pill)}
+.hist-mmark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--rule-strong)}
+.hist-sess{border-bottom:1px solid var(--rule);padding:10px 0;font-size:12.5px}
+.hist-sess:last-child{border-bottom:0}
+.hist-sess b{display:block;font-size:13px;margin-bottom:2px}
+.hist-sess span{color:var(--muted)}
 #dayPickList button{display:flex;justify-content:space-between;align-items:center;gap:12px;
   width:100%;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--rule);
   padding:12px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink)}
@@ -648,6 +661,7 @@ input[type=number],input[type=text]{padding:8px 9px}
       <section class="menu" id="menu"></section>
       <div class="start-cta">
         <button class="start-btn" id="startBtn">スタート</button>
+        <button class="start-btn outline" id="historyBtn" style="margin-top:8px">記録を見る</button>
         <p class="hint" style="margin-top:10px">この週のメニューをその場で進めます。まずどの日を始めるか選びます。レップはタップで数え、休憩は自動でカウントダウンします。</p>
       </div>
       <div class="pdf-export">
@@ -658,6 +672,12 @@ input[type=number],input[type=text]{padding:8px 9px}
     </main>
   </div>
 </div>
+
+<div class="modal" id="historyModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3>トレーニング記録</h3><div class="sub">実行モードで「セット完了」を押すたびに記録されます。</div></div>
+    <button class="x" id="historyClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body" id="historyBody"></div>
+</div></div>
 
 <div class="modal" id="dayPickModal"><div class="sheet" role="dialog" aria-modal="true">
   <div class="sheet-head"><div><h3>どの日から始めますか？</h3><div class="sub">表示中の週間メニューが対象です。</div></div>
@@ -2881,33 +2901,35 @@ function parseSecFromReps(str){
   return m ? +m[1] : null;
 }
 
-function buildExecSteps(day){
+function buildExecSteps(day, di){
   const steps = [];
   const push = s => steps.push(s);
   const restStep = (sec, label) => push({kind:'rest', sec: sec||0, label: label||'休憩'});
   day.groups.forEach(g=>{
     const b = g.blocks[0];
     if(b.blocked) return;
+    const effort = b.toFailure ? 'max' : b.submax ? 'submax' : 'normal';
+    const repStep = (ex, i, reps, setLabel) => push({kind:'rep', ex, reps, setLabel, di, bi:g.bi, i, blockType:b.type, effort});
     if(b.type==='straight'){
       for(let s=0;s<b.sets;s++){
-        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`セット ${s+1} / ${b.sets}`});
+        repStep(b.exs[0], 0, b.reps, `セット ${s+1} / ${b.sets}`);
         restStep(b.rest);
       }
     } else if(b.type==='restpause'){
       for(let m=0;m<b.minis;m++){
-        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`ミニセット ${m+1} / ${b.minis}`});
+        repStep(b.exs[0], 0, b.reps, `ミニセット ${m+1} / ${b.minis}`);
         if(m<b.minis-1) restStep(b.pause,'停止');
       }
       restStep(b.rest);
     } else if(b.type==='drop'){
       for(let st=0;st<b.stages;st++){
-        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`${st+1}段階目 / ${b.stages}`});
+        repStep(b.exs[0], 0, b.reps, `${st+1}段階目 / ${b.stages}`);
       }
       restStep(b.rest);
     } else if(b.type==='round'){
       for(let r=0;r<b.rounds;r++){
         b.exs.forEach((ex,i)=>{
-          push({kind:'rep', ex, reps:b.reps, setLabel:`ラウンド ${r+1} / ${b.rounds}`});
+          repStep(ex, i, b.reps, `ラウンド ${r+1} / ${b.rounds}`);
           if(i<b.exs.length-1) restStep(b.restIn,'種目間');
         });
         if(r<b.rounds-1) restStep(b.rest,'ラウンド間');
@@ -2915,7 +2937,7 @@ function buildExecSteps(day){
     } else if(b.type==='pair'){
       for(let s=0;s<b.sets;s++){
         b.exs.forEach((ex,i)=>{
-          push({kind:'rep', ex, reps:b.reps, setLabel:`ペア ${s+1} / ${b.sets}`});
+          repStep(ex, i, b.reps, `ペア ${s+1} / ${b.sets}`);
           if(i<b.exs.length-1) restStep(b.restIn,'種目間');
         });
         if(s<b.sets-1) restStep(b.rest,'ペア後');
@@ -2998,7 +3020,7 @@ function execRenderStep(){
     $('#execLabel').textContent = '秒キープ';
     execRingSet(1,false);
     $('#execControls').innerHTML = `<button class="exec-tap" id="execDoneBtn">完了</button>`;
-    $('#execDoneBtn').onclick = ()=> execNext();
+    $('#execDoneBtn').onclick = ()=>{ logSet(step, null, secTarget); execNext(); };
     execTimerId = setInterval(()=>{
       execSecLeft--;
       $('#execBig').textContent = Math.max(0, execSecLeft);
@@ -3012,7 +3034,7 @@ function execRenderStep(){
     $('#execLabel').textContent = '回・目安';
     execRingSet(1,false);
     $('#execControls').innerHTML = `<button class="exec-tap" id="execSetDoneBtn">セット<br>完了</button>`;
-    $('#execSetDoneBtn').onclick = ()=> execNext();
+    $('#execSetDoneBtn').onclick = ()=>{ logSet(step, target, null); execNext(); };
   }
 }
 
@@ -3030,19 +3052,92 @@ function loadExecProgress(){
   try{ const raw = localStorage.getItem(EXEC_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
 }
 
+/* ============================================================
+   9.5 セッションログ（実績の記録）
+   実行モードで「セット完了」を押すたびに、実際の重量・レップ・努力度を
+   記録する。予定値をそのまま実績として自動確定し、値を変えたい時だけ
+   ユーザーが触る方式（毎セット確認させると「セット完了」1タップの
+   軽さが壊れるため）。完了したセッションはworkoutSessionsに蓄積し、
+   将来の履歴可視化（週次セット数・e1RM推移等）の土台にする。
+   ============================================================ */
+const SESSIONS_KEY = 'workoutSessions';
+const CURRENT_SESSION_KEY = 'workoutCurrentSession';
+let currentSession = null;
+
+function loadSessions(){ try{ return JSON.parse(localStorage.getItem(SESSIONS_KEY))||[]; }catch(e){ return []; } }
+function saveSessions(list){ try{ localStorage.setItem(SESSIONS_KEY, JSON.stringify(list)); }catch(e){} }
+function saveCurrentSession(){ try{ localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(currentSession)); }catch(e){} }
+function loadCurrentSession(){ try{ const raw=localStorage.getItem(CURRENT_SESSION_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+function clearCurrentSession(){ try{ localStorage.removeItem(CURRENT_SESSION_KEY); }catch(e){} currentSession=null; }
+
+/* 記録しかけのまま放置されたセッション（別の日を新しく始めた等）も、
+   記録したぶんは失わずに完了セッション一覧へ書き出しておく。 */
+function finalizeCurrentSession(){
+  if(currentSession && currentSession.sets.length){
+    currentSession.endedAt = new Date().toISOString();
+    const list = loadSessions();
+    list.push(currentSession);
+    saveSessions(list);
+  }
+  clearCurrentSession();
+}
+
+function startOrResumeSession(di){
+  const saved = loadCurrentSession();
+  if(saved && saved.methodId===currentMethod.id && saved.week===+$('#week').value && saved.di===di){
+    currentSession = saved; // 同じ日の続きなら記録済みのセットに追記していく
+    return;
+  }
+  finalizeCurrentSession(); // 別の日・別のセッションが残っていれば、記録済み分だけ確定させる
+  currentSession = {
+    id: 'sess_'+Date.now(),
+    date: new Date().toISOString().slice(0,10),
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    methodId: currentMethod.id,
+    week: +$('#week').value,
+    di,
+    dayName: currentWk.plans[di].day.ja,
+    sets: []
+  };
+  saveCurrentSession();
+}
+
+/* targetReps か targetSec のどちらか一方が入る（時間ベース種目はレップ数を持たない）。
+   重量は、その種目に予定として入力されている値をそのまま実績の初期値にする
+   （＝タップするだけで「予定通りできた」を記録したことになる）。 */
+function logSet(step, targetReps, targetSec){
+  if(!currentSession) return;
+  const plannedW = weightOv[weightKey(currentMethod.id, currentSession.week, step.di, step.bi, step.i)];
+  currentSession.sets.push({
+    exId: step.ex.id, exJa: step.ex.ja, m: step.ex.m, sub: step.ex.sub||null,
+    blockType: step.blockType, setLabel: step.setLabel,
+    targetReps, actualReps: targetReps,
+    targetSec, actualSec: targetSec,
+    weightKg: (plannedW!=null && plannedW!=='') ? +plannedW : null,
+    effort: step.effort, doneAt: new Date().toISOString()
+  });
+  saveCurrentSession();
+}
+
 function execNext(){
   if(execIdx < execSteps.length-1) execIdx++;
   execRenderStep();
-  if(execSteps[execIdx].kind==='done') clearExecProgress(); else saveExecProgress();
+  if(execSteps[execIdx].kind==='done'){
+    clearExecProgress();
+    if(currentSession){ currentSession.endedAt = new Date().toISOString();
+      const list = loadSessions(); list.push(currentSession); saveSessions(list); clearCurrentSession(); }
+  } else saveExecProgress();
 }
 function execPrev(){ if(execIdx>0) execIdx--; execRenderStep(); saveExecProgress(); }
 
 function execOpen(di, resumeIdx){
   const day = currentWk && currentWk.plans[di];
   if(!day) return;
-  execSteps = buildExecSteps(day);
+  execSteps = buildExecSteps(day, di);
   execDi = di;
   execIdx = (resumeIdx!=null && resumeIdx < execSteps.length-1) ? resumeIdx : 0;
+  startOrResumeSession(di);
   $('#execDayLabel').textContent = day.day.ja;
   $('#dayPickModal').classList.remove('on');
   $('#execView').classList.add('on');
@@ -3082,6 +3177,54 @@ $('#execSkip').addEventListener('click', execNext);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#execView').classList.contains('on')) execClose(); });
 
 // 保存された設定があれば復元（内部でrenderも呼ぶ）。なければ通常どおり初期表示する。
+function renderHistory(){
+  const sessions = loadSessions();
+  const cur = loadCurrentSession();
+  const all = cur ? [...sessions, {...cur, inProgress:true}] : sessions;
+  const totalSessions = sessions.length;
+  const totalSets = sessions.reduce((s,ss)=>s+ss.sets.length,0);
+  const totalVolume = sessions.reduce((s,ss)=>s+ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0),0);
+
+  const weekAgo = Date.now() - 7*24*3600*1000;
+  const hardByM = {};
+  all.forEach(ss=>{ // 進行中セッション（currentSession）の分も含める
+    if(new Date(ss.startedAt).getTime() < weekAgo) return;
+    ss.sets.forEach(st=>{ if(st.effort==='max') hardByM[st.m]=(hardByM[st.m]||0)+1; });
+  });
+
+  let html = `<div class="hist-summary">
+    <div><b>${totalSessions}</b><span>セッション</span></div>
+    <div><b>${totalSets}</b><span>記録セット</span></div>
+    <div><b>${Math.round(totalVolume).toLocaleString()}</b><span>総ボリューム(kg)</span></div>
+  </div>`;
+
+  html += `<h4 style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px">直近7日間のハードセット数（部位別・「限界まで」設定のみ）</h4>`;
+  if(Object.keys(hardByM).length){
+    const max = Math.max(...MORDER.map(m=>hardByM[m]||0), 1);
+    html += MORDER.map(m=>{
+      const v = hardByM[m]||0;
+      return `<div class="hist-mrow"><span>${MUSCLES[m].ja}</span><div class="hist-mtrack"><div class="hist-mfill" style="width:${v/max*100}%;background:${MUSCLES[m].color}"></div></div><span>${v}</span></div>`;
+    }).join('');
+  } else {
+    html += `<p class="hint">まだ記録がありません。実行モードで努力係数「限界まで」のセットをこなすと、ここに表示されます。</p>`;
+  }
+  html += `<p class="hint" style="margin-top:2px">MEV/MAV/MRVの目標ラインは今後追加予定です。</p>`;
+
+  html += `<h4 style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px">セッション履歴</h4>`;
+  if(all.length){
+    html += [...all].reverse().map(ss=>{
+      const vol = Math.round(ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0));
+      return `<div class="hist-sess"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>`;
+    }).join('');
+  } else {
+    html += `<p class="hint">まだ記録がありません。</p>`;
+  }
+  $('#historyBody').innerHTML = html;
+}
+$('#historyBtn').addEventListener('click', ()=>{ renderHistory(); $('#historyModal').classList.add('on'); });
+$('#historyClose').addEventListener('click', ()=> $('#historyModal').classList.remove('on'));
+$('#historyModal').addEventListener('click', e=>{ if(e.target.id==='historyModal') $('#historyModal').classList.remove('on'); });
+
 if(!loadFromLocal()) render();
 </script>
 </body>
