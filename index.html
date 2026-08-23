@@ -514,6 +514,13 @@ input[type=number],input[type=text]{padding:8px 9px}
 .hist-mmark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--rule-strong)}
 .hist-sess{border-bottom:1px solid var(--rule);padding:10px 0;font-size:12.5px}
 .hist-sess:last-child{border-bottom:0}
+.hist-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
+.hist-h:first-of-type{margin-top:0}
+.hist-toggle{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.hist-toggle label{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;user-select:none}
+.hist-toggle input{width:15px;height:15px;accent-color:var(--ink)}
+.hist-heat{overflow-x:auto;padding-bottom:4px}
+#historyModal .sheet{max-width:720px}
 .hist-sess b{display:block;font-size:13px;margin-bottom:2px}
 .hist-sess span{color:var(--muted)}
 #dayPickList button{display:flex;justify-content:space-between;align-items:center;gap:12px;
@@ -3177,49 +3184,216 @@ $('#execSkip').addEventListener('click', execNext);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#execView').classList.contains('on')) execClose(); });
 
 // 保存された設定があれば復元（内部でrenderも呼ぶ）。なければ通常どおり初期表示する。
+/* ============================================================
+   9.6 履歴の可視化（Phase 2）
+   すべて手書きSVG（外部ライブラリ不使用、単一HTML完結の制約のため）。
+   MEV/MAV/MRVの目標ラインは、まだ専用の設定UI（マニュアルモード側で
+   実装予定）が無いので、暫定の一般的な目安値を既定値として使う。
+   ============================================================ */
+const DEFAULT_VOLUME_TARGETS = {
+  chest:{mev:6,mav:12,mrv:20}, back:{mev:8,mav:14,mrv:22}, shoulder:{mev:6,mav:12,mrv:20},
+  arm:{mev:6,mav:12,mrv:20}, legs:{mev:8,mav:14,mrv:22}, glute:{mev:4,mav:10,mrv:16}, core:{mev:0,mav:8,mrv:16}
+};
+function volumeTargetFor(m){
+  try{ const raw = localStorage.getItem('workoutVolumeTargets'); const custom = raw?JSON.parse(raw):null;
+    if(custom && custom[m]) return custom[m]; }catch(e){}
+  return DEFAULT_VOLUME_TARGETS[m];
+}
+
+/* 8週分・週4回のサンプルセッションを生成する（実データには一切触れない、表示専用）。
+   重量は週を追うごとにゆるく右肩上がりにして、e1RM推移のグラフに動きが出るようにしている。 */
+function generateSampleSessions(){
+  const weeks = 8;
+  const today = new Date();
+  const rotation = [
+    {name:'プッシュ（サンプル）', mainEx:{chest:'bp', shoulder:'ohp', arm:'nbp'}},
+    {name:'プル（サンプル）', mainEx:{back:'row', arm:'bcurl'}},
+    {name:'脚（サンプル）', mainEx:{legs:'sq', glute:'hip_thrust'}},
+    {name:'体幹・補助（サンプル）', mainEx:{core:'crun', shoulder:'side'}}
+  ];
+  const startW = {bp:60, ohp:35, nbp:40, row:55, bcurl:20, sq:80, hip_thrust:70, crun:0, side:8};
+  const sessions = [];
+  for(let w=0; w<weeks; w++){
+    rotation.forEach((day,di)=>{
+      const daysAgo = (weeks-1-w)*7 + (rotation.length-1-di);
+      const date = new Date(today.getTime() - daysAgo*86400000);
+      const sets = [];
+      Object.entries(day.mainEx).forEach(([m,exId])=>{
+        const ex = EXBY[exId]; if(!ex) return;
+        const progress = w/(weeks-1);
+        const base = startW[exId] ?? 20;
+        const wt = Math.round((base*(1+progress*0.18) + (Math.random()*4-2))*2)/2;
+        const setCount = 3 + (di===2?1:0);
+        for(let si=0; si<setCount; si++){
+          const reps = 6 + Math.round(Math.random()*6);
+          sets.push({
+            exId, exJa:ex.ja, m, sub:ex.sub||null, blockType:'straight',
+            setLabel:`セット ${si+1} / ${setCount}`,
+            targetReps:reps, actualReps:reps, targetSec:null, actualSec:null,
+            weightKg: ex.loadUnit==='bw' ? null : wt,
+            effort: si===setCount-1 ? 'max' : 'normal',
+            doneAt: new Date(date.getTime()+si*5*60000).toISOString()
+          });
+        }
+      });
+      sessions.push({id:`sample_${w}_${di}`, date:date.toISOString().slice(0,10), startedAt:date.toISOString(),
+        endedAt:new Date(date.getTime()+50*60000).toISOString(), methodId:'sample', week:0, di,
+        dayName:day.name, sets, sample:true});
+    });
+  }
+  return sessions.sort((a,b)=> new Date(a.startedAt)-new Date(b.startedAt));
+}
+
+function e1rm(weightKg, reps){ // Epley式。実在する一般的な推定式
+  if(!weightKg || !reps) return 0;
+  return weightKg * (1 + reps/30);
+}
+function isoWeekKey(dateStr){
+  const d = new Date(dateStr); const day = (d.getDay()+6)%7; // 月曜始まり
+  d.setDate(d.getDate()-day); return d.toISOString().slice(0,10);
+}
+
+function svgLineChart(series, opts){
+  opts = opts||{};
+  const W=opts.w||620, H=opts.h||200, pad={l:34,r:10,t:12,b:20};
+  const refLines = opts.refLines||[];
+  const allPts = series.flatMap(s=>s.points);
+  if(!allPts.length) return `<p class="hint">データがありません。</p>`;
+  const xs = allPts.map(p=>p.x);
+  const xMin=Math.min(...xs), xMax=Math.max(...xs);
+  const yMax = Math.max(1, ...allPts.map(p=>p.y), ...refLines.map(r=>r.y))*1.15;
+  const X = x => pad.l + (xMax>xMin ? (x-xMin)/(xMax-xMin) : 0.5) * (W-pad.l-pad.r);
+  const Y = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
+  const gridY = [0,0.5,1].map(f=>{
+    const val = Math.round(yMax*f);
+    return `<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(val).toFixed(1)}" y2="${Y(val).toFixed(1)}" stroke="var(--rule)" stroke-width="1"/>`
+      + `<text x="${pad.l-6}" y="${(Y(val)+3).toFixed(1)}" font-size="9" fill="var(--muted)" text-anchor="end">${val}</text>`;
+  }).join('');
+  const refs = refLines.map(r=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(r.y).toFixed(1)}" y2="${Y(r.y).toFixed(1)}" stroke="${r.color||'var(--muted)'}" stroke-width="1.5" stroke-dasharray="4 3"/>`
+    + `<text x="${W-pad.r}" y="${(Y(r.y)-3).toFixed(1)}" font-size="9" fill="${r.color||'var(--muted)'}" text-anchor="end">${r.label}</text>`).join('');
+  const lines = series.map(s=>{
+    if(!s.points.length) return '';
+    const d = s.points.map((p,i)=> `${i===0?'M':'L'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+    const dots = s.points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.6" fill="${s.color}"><title>${p.label||''}</title></circle>`).join('');
+    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>${dots}`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block">${gridY}${refs}${lines}</svg>`;
+}
+
+function svgHeatmap(dayVolumes, weeksBack){
+  weeksBack = weeksBack||10;
+  const cell=13, gap=3;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(today.getTime() - (weeksBack*7-1)*86400000);
+  start.setDate(start.getDate() - start.getDay());
+  const maxV = Math.max(1, ...Object.values(dayVolumes));
+  let cells = '';
+  for(let w=0; w<=weeksBack; w++){
+    for(let d=0; d<7; d++){
+      const date = new Date(start.getTime() + (w*7+d)*86400000);
+      if(date>today) continue;
+      const key = date.toISOString().slice(0,10);
+      const v = dayVolumes[key]||0;
+      const alpha = v ? Math.min(1, 0.18+0.82*(v/maxV)) : 0.07;
+      const x = w*(cell+gap), y = d*(cell+gap);
+      cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="var(--ink)" opacity="${alpha.toFixed(2)}"><title>${key}${v?` ・ 約${Math.round(v).toLocaleString()}kg`:''}</title></rect>`;
+    }
+  }
+  const W=(weeksBack+1)*(cell+gap), H=7*(cell+gap);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${cells}</svg>`;
+}
+
+let historySampleMode = false;
 function renderHistory(){
-  const sessions = loadSessions();
+  const realSessions = loadSessions();
   const cur = loadCurrentSession();
-  const all = cur ? [...sessions, {...cur, inProgress:true}] : sessions;
+  const realAll = cur ? [...realSessions, {...cur, inProgress:true}] : realSessions;
+  const sessions = historySampleMode ? generateSampleSessions() : realSessions;
+  const all = historySampleMode ? sessions : realAll;
+
   const totalSessions = sessions.length;
   const totalSets = sessions.reduce((s,ss)=>s+ss.sets.length,0);
   const totalVolume = sessions.reduce((s,ss)=>s+ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0),0);
 
-  const weekAgo = Date.now() - 7*24*3600*1000;
-  const hardByM = {};
-  all.forEach(ss=>{ // 進行中セッション（currentSession）の分も含める
-    if(new Date(ss.startedAt).getTime() < weekAgo) return;
-    ss.sets.forEach(st=>{ if(st.effort==='max') hardByM[st.m]=(hardByM[st.m]||0)+1; });
-  });
+  let html = `<div class="hist-toggle">
+    <label><input type="checkbox" id="histSampleToggle" ${historySampleMode?'checked':''}> サンプルデータで表示（実データには影響しません）</label>
+  </div>`;
+  if(!historySampleMode && !realAll.length){
+    html += `<p class="hint">まだ記録がありません。実行モードで「セット完了」を押すと、ここに蓄積されていきます。上のチェックボックスで、データが溜まった時にどう見えるかのサンプルを確認できます。</p>`;
+    $('#historyBody').innerHTML = html;
+    wireHistoryToggle();
+    return;
+  }
 
-  let html = `<div class="hist-summary">
+  html += `<div class="hist-summary">
     <div><b>${totalSessions}</b><span>セッション</span></div>
     <div><b>${totalSets}</b><span>記録セット</span></div>
     <div><b>${Math.round(totalVolume).toLocaleString()}</b><span>総ボリューム(kg)</span></div>
   </div>`;
 
-  html += `<h4 style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px">直近7日間のハードセット数（部位別・「限界まで」設定のみ）</h4>`;
-  if(Object.keys(hardByM).length){
-    const max = Math.max(...MORDER.map(m=>hardByM[m]||0), 1);
-    html += MORDER.map(m=>{
-      const v = hardByM[m]||0;
-      return `<div class="hist-mrow"><span>${MUSCLES[m].ja}</span><div class="hist-mtrack"><div class="hist-mfill" style="width:${v/max*100}%;background:${MUSCLES[m].color}"></div></div><span>${v}</span></div>`;
-    }).join('');
-  } else {
-    html += `<p class="hint">まだ記録がありません。実行モードで努力係数「限界まで」のセットをこなすと、ここに表示されます。</p>`;
-  }
-  html += `<p class="hint" style="margin-top:2px">MEV/MAV/MRVの目標ラインは今後追加予定です。</p>`;
+  // 週次ハードセット数（部位別・選択式）＋MEV/MAV/MRV
+  const weekKeys = [...new Set(sessions.map(ss=>isoWeekKey(ss.date)))].sort();
+  html += `<h4 class="hist-h">週次ハードセット数（部位別・「限界まで」設定のみ）</h4>
+    <div class="row" style="margin-bottom:8px"><div class="field"><select id="histMuscleSel">${MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('')}</select></div></div>
+    <div id="histMuscleChart"></div>
+    <div class="lg" style="margin-top:8px"><span class="dot" style="background:var(--ink)"></span>実績</div>`;
 
-  html += `<h4 style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px">セッション履歴</h4>`;
-  if(all.length){
-    html += [...all].reverse().map(ss=>{
-      const vol = Math.round(ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0));
-      return `<div class="hist-sess"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>`;
-    }).join('');
+  // e1RM推移（種目選択式）
+  const exIdsWithData = [...new Set(sessions.flatMap(ss=>ss.sets.filter(st=>st.weightKg).map(st=>st.exId)))];
+  html += `<h4 class="hist-h">推定1RMの推移（Epley式：重量×(1+レップ÷30)）</h4>`;
+  if(exIdsWithData.length){
+    html += `<div class="row" style="margin-bottom:8px"><div class="field"><select id="histExSel">${exIdsWithData.map(id=>`<option value="${id}">${(EXBY[id]&&EXBY[id].ja)||id}</option>`).join('')}</select></div></div>
+      <div id="histExChart"></div>`;
   } else {
-    html += `<p class="hint">まだ記録がありません。</p>`;
+    html += `<p class="hint">重量を記録した種目がまだありません。</p>`;
   }
+
+  // カレンダーヒートマップ
+  const dayVol = {};
+  all.forEach(ss=>{
+    const vol = ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0);
+    dayVol[ss.date] = (dayVol[ss.date]||0) + vol;
+  });
+  html += `<h4 class="hist-h">継続の記録（直近10週）</h4><div class="hist-heat">${svgHeatmap(dayVol,10)}</div>`;
+
+  html += `<h4 class="hist-h">セッション履歴</h4>`;
+  html += [...all].reverse().slice(0,30).map(ss=>{
+    const vol = Math.round(ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0));
+    return `<div class="hist-sess"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>`;
+  }).join('');
+
   $('#historyBody').innerHTML = html;
+  wireHistoryToggle();
+
+  function drawMuscleChart(){
+    const m = $('#histMuscleSel').value;
+    const t = volumeTargetFor(m);
+    const points = weekKeys.map((wk,i)=>{
+      const cnt = sessions.filter(ss=>isoWeekKey(ss.date)===wk)
+        .reduce((n,ss)=>n+ss.sets.filter(st=>st.m===m && st.effort==='max').length, 0);
+      return {x:i, y:cnt, label:`${wk}: ${cnt}セット`};
+    });
+    $('#histMuscleChart').innerHTML = svgLineChart([{label:MUSCLES[m].ja, color:MUSCLES[m].color, points}], {
+      refLines:[{y:t.mev,label:'MEV',color:'var(--muted)'},{y:t.mav,label:'MAV',color:'var(--ink)'},{y:t.mrv,label:'MRV',color:'var(--m-chest)'}]
+    });
+  }
+  function drawExChart(){
+    const sel = $('#histExSel'); if(!sel) return;
+    const exId = sel.value;
+    const points = [];
+    [...sessions].sort((a,b)=>new Date(a.startedAt)-new Date(b.startedAt)).forEach((ss,i)=>{
+      const best = Math.max(0, ...ss.sets.filter(st=>st.exId===exId && st.weightKg).map(st=>e1rm(st.weightKg, st.actualReps)));
+      if(best>0) points.push({x:new Date(ss.startedAt).getTime(), y:Math.round(best*10)/10, label:`${ss.date}: 推定${Math.round(best)}kg`});
+    });
+    $('#histExChart').innerHTML = svgLineChart([{label:EXBY[exId]?.ja||exId, color:'var(--ink)', points}]);
+  }
+  $('#histMuscleSel').addEventListener('change', drawMuscleChart);
+  drawMuscleChart();
+  if($('#histExSel')){ $('#histExSel').addEventListener('change', drawExChart); drawExChart(); }
+}
+function wireHistoryToggle(){
+  const t = $('#histSampleToggle'); if(!t) return;
+  t.addEventListener('change', ()=>{ historySampleMode = t.checked; renderHistory(); });
 }
 $('#historyBtn').addEventListener('click', ()=>{ renderHistory(); $('#historyModal').classList.add('on'); });
 $('#historyClose').addEventListener('click', ()=> $('#historyModal').classList.remove('on'));
