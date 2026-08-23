@@ -2323,8 +2323,9 @@ function drawScorePanel(wk, bt){
 }
 
 function setCredo(method){
-  // 標準メニューはボディビル格言・ミームからランダムに表示（ダブルタップでシャッフル）
-  const isStd = method.id === 'std';
+  // 標準・マニュアルは考案者に紐づかないため、ボディビル格言・ミームから
+  // ランダムに表示する（ダブルタップでシャッフル）
+  const isStd = method.id === 'std' || method.id === 'manual';
   const c = isStd ? MEMES[memeIdx] : CREDO[method.id];
   const h = $('#headline');
   if(h.textContent !== c.line){
@@ -2943,12 +2944,12 @@ function onQuoteTap(){
     if(qTap >= 3){
       unlockPro();
     } else if(qTap === 2){
-      const cur = $('#method').value;
-      if(cur === 'std'){
+      const isStdLike = appMode==='manual' || $('#method').value === 'std';
+      if(isStdLike){
         let next = memeIdx;
         while(next === memeIdx && MEMES.length > 1) next = Math.floor(Math.random()*MEMES.length);
         memeIdx = next;
-        setCredo(METHODS.find(m=>m.id==='std'));
+        setCredo(currentMethod && currentMethod.id==='manual' ? currentMethod : METHODS.find(m=>m.id==='std'));
       }
     }
     qTap = 0;
@@ -3785,6 +3786,7 @@ function renderManual(){
   const wk = buildManualWeek();
   currentWk = wk;
   renderManualPanel();
+  setCredo(pseudoMethod);
   drawMenu({method:pseudoMethod, wk, mins:9999});
   $('#resetSwap').classList.add('hide');
   drawFoot();
@@ -3864,8 +3866,12 @@ $('#exPickList').addEventListener('click', ev=>{
   renderExPickList();
 });
 $('#exPickCustomBtn').addEventListener('click', ()=> $('#customExModal').classList.add('on'));
-$('#exPickClose').addEventListener('click', ()=> $('#exPickModal').classList.remove('on'));
-$('#exPickModal').addEventListener('click', e=>{ if(e.target.id==='exPickModal') $('#exPickModal').classList.remove('on'); });
+function closeExPicker(){
+  $('#exPickModal').classList.remove('on');
+  if(exPickAppendBi!=null && exPickDi!=null) openBlockEditor(exPickDi, exPickAppendBi); // ブロック編集から来た場合はそこへ戻す
+}
+$('#exPickClose').addEventListener('click', closeExPicker);
+$('#exPickModal').addEventListener('click', e=>{ if(e.target.id==='exPickModal') closeExPicker(); });
 $('#exPickAdd').addEventListener('click', ()=>{
   if(exPickDi==null || !exPickSelected.size) return;
   const ids = [...exPickSelected];
@@ -3979,6 +3985,7 @@ $('#beExList').addEventListener('click', ev=>{
 });
 $('#beAddEx').addEventListener('click', ()=>{
   if(!blockEditTarget) return;
+  $('#blockEditModal').classList.remove('on'); // 開いたままだと同じz-indexで種目ピッカーの下に隠れて操作できない
   openExPickerAppend(blockEditTarget.di, String(blockEditTarget.bi));
 });
 $('#beType').addEventListener('change', ()=>{
