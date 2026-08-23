@@ -494,6 +494,55 @@ input[type=number],input[type=text]{padding:8px 9px}
 .savebtn.outline,.reroll{background:var(--surface-2);border-color:var(--rule)}
 .verdict-tag,.blk-kind{border-radius:var(--radius-sm)}
 .sigmark,.added-badge,.ex-name .swapped{border-radius:6px}
+
+/* ============================================================
+   9. 実行モード（スタート）
+   ============================================================ */
+.start-cta{margin-top:44px;border-top:2px solid var(--rule-strong);padding-top:20px}
+.start-btn{display:block;width:100%;background:var(--ink);color:var(--on-dark);border:0;
+  padding:16px 22px;font-weight:800;font-size:15px;cursor:pointer;border-radius:var(--radius-pill);
+  box-shadow:var(--shadow-soft)}
+.start-btn:hover{opacity:.9}
+#dayPickList button{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  width:100%;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--rule);
+  padding:12px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink)}
+#dayPickList button:last-child{border-bottom:0}
+#dayPickList button:hover:not(:disabled){background:var(--surface-2)}
+#dayPickList button:disabled{opacity:.4;cursor:not-allowed}
+#dayPickList button small{color:var(--muted);font-weight:500}
+
+.exec{position:fixed;inset:0;background:var(--ground);background-attachment:fixed;
+  z-index:300;display:none;flex-direction:column}
+.exec.on{display:flex}
+.exec-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 4px;gap:12px;flex:none}
+.exec-close{background:var(--surface-2);border:1px solid var(--rule);border-radius:50%;
+  width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
+.exec-day{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:12px;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.exec-progress{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 800;font-size:13px;color:var(--muted)}
+.exec-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;gap:16px;overflow-y:auto;text-align:center}
+.exec-setlabel{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.exec-exname{font-size:26px;font-weight:800;max-width:90vw;line-height:1.25}
+.exec-exsub{font-size:13px;color:var(--muted)}
+.exec-ring-wrap{position:relative;width:min(64vw,260px);height:min(64vw,260px);margin:6px 0}
+.exec-ring{width:100%;height:100%;transform:rotate(-90deg)}
+.exec-ring-bg{fill:none;stroke:var(--surface-2);stroke-width:14}
+.exec-ring-fg{fill:none;stroke:var(--ink);stroke-width:14;stroke-linecap:round;transition:stroke-dashoffset .22s linear,stroke .2s}
+.exec-ring-fg.rest{stroke:var(--m-back)}
+.exec-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.exec-ring-big{font-family:var(--display);font-variation-settings:'wdth' 118,'wght' 900;font-size:52px;line-height:1}
+.exec-ring-label{font-size:12px;color:var(--muted);font-weight:700}
+.exec-controls{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:52px}
+.exec-tap{width:84px;height:84px;border-radius:50%;background:var(--ink);color:var(--on-dark);
+  border:0;font-size:15px;font-weight:800;cursor:pointer;box-shadow:var(--shadow-soft)}
+.exec-tap:active{transform:scale(.96)}
+.exec-adj{background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);
+  padding:9px 16px;font-size:13px;cursor:pointer;color:var(--ink);font-weight:700}
+.exec-foot{display:flex;gap:10px;padding:14px 20px 26px;flex:none}
+.exec-foot button{flex:1;padding:13px;border-radius:var(--radius-pill);border:1px solid var(--rule);
+  background:var(--surface-2);font-weight:700;font-size:13px;cursor:pointer;color:var(--ink)}
+.exec-foot button:disabled{opacity:.35;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -593,12 +642,52 @@ input[type=number],input[type=text]{padding:8px 9px}
         <div class="conv" id="conv"></div>
       </section>
       <section class="menu" id="menu"></section>
+      <div class="start-cta">
+        <button class="start-btn" id="startBtn">スタート</button>
+        <p class="hint" style="margin-top:10px">この週のメニューをその場で進めます。まずどの日を始めるか選びます。レップはタップで数え、休憩は自動でカウントダウンします。</p>
+      </div>
       <div class="pdf-export">
         <button class="pdf-btn" id="pdfBtn">この週間メニューをPDF出力する</button>
         <p class="hint">印刷ダイアログが開きます。送信先（プリンター）で「PDFに保存」を選ぶとファイルになります。<b>週間メニュー全体を横向き1枚に収め</b>、日数が多い場合は自動で文字を縮小します（極端に種目数が多いと、それでも収まりきらないことがあります）。</p>
       </div>
       <div class="foot" id="foot"></div>
     </main>
+  </div>
+</div>
+
+<div class="modal" id="dayPickModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3>どの日から始めますか？</h3><div class="sub">表示中の週間メニューが対象です。</div></div>
+    <button class="x" id="dayPickClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div id="dayPickList"></div>
+  </div>
+</div></div>
+
+<div class="exec" id="execView">
+  <div class="exec-head">
+    <button class="exec-close" id="execClose" aria-label="終了">&times;</button>
+    <div class="exec-day" id="execDayLabel">—</div>
+    <div class="exec-progress" id="execProgress">—</div>
+  </div>
+  <div class="exec-body">
+    <div class="exec-setlabel" id="execSetLabel">—</div>
+    <div class="exec-exname" id="execExName">—</div>
+    <div class="exec-exsub" id="execExSub">—</div>
+    <div class="exec-ring-wrap">
+      <svg class="exec-ring" viewBox="0 0 200 200">
+        <circle class="exec-ring-bg" cx="100" cy="100" r="90"></circle>
+        <circle class="exec-ring-fg" id="execRingFg" cx="100" cy="100" r="90"></circle>
+      </svg>
+      <div class="exec-ring-center">
+        <div class="exec-ring-big" id="execBig">0</div>
+        <div class="exec-ring-label" id="execLabel">—</div>
+      </div>
+    </div>
+    <div class="exec-controls" id="execControls"></div>
+  </div>
+  <div class="exec-foot">
+    <button id="execPrev">◀ 前へ</button>
+    <button id="execSkip">スキップ ▶</button>
   </div>
 </div>
 
@@ -2740,6 +2829,201 @@ $('#importFile').addEventListener('change', ev=>{
   reader.readAsText(file);
   ev.target.value = '';
 });
+
+/* ============================================================
+   9. 実行モード（スタート）
+   週間メニューを実際にやる時の進行画面。ブロックの種類（straight/
+   restpause/drop/round/pair）ごとに「レップを数える区間」と
+   「休憩する区間」の並びをフラットな手順リストに展開し、順番に進める。
+   レップはタップで+1、休憩はTime Timerのような円グラフで自動カウントダウンする。
+   時間ベースの種目（プランク等、reps文字列に「秒」を含む）はレップの
+   代わりに秒数カウントダウンにする。
+   ============================================================ */
+let execSteps = [], execIdx = 0, execRepCount = 0, execTimerId = null, execSecLeft = 0, execSecTotal = 0;
+
+function parseSecFromReps(str){
+  const m = str && String(str).match(/(\d+)\s*秒/);
+  return m ? +m[1] : null;
+}
+
+function buildExecSteps(day){
+  const steps = [];
+  const push = s => steps.push(s);
+  const restStep = (sec, label) => push({kind:'rest', sec: sec||0, label: label||'休憩'});
+  day.groups.forEach(g=>{
+    const b = g.blocks[0];
+    if(b.blocked) return;
+    if(b.type==='straight'){
+      for(let s=0;s<b.sets;s++){
+        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`セット ${s+1} / ${b.sets}`});
+        restStep(b.rest);
+      }
+    } else if(b.type==='restpause'){
+      for(let m=0;m<b.minis;m++){
+        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`ミニセット ${m+1} / ${b.minis}`});
+        if(m<b.minis-1) restStep(b.pause,'停止');
+      }
+      restStep(b.rest);
+    } else if(b.type==='drop'){
+      for(let st=0;st<b.stages;st++){
+        push({kind:'rep', ex:b.exs[0], reps:b.reps, setLabel:`${st+1}段階目 / ${b.stages}`});
+      }
+      restStep(b.rest);
+    } else if(b.type==='round'){
+      for(let r=0;r<b.rounds;r++){
+        b.exs.forEach((ex,i)=>{
+          push({kind:'rep', ex, reps:b.reps, setLabel:`ラウンド ${r+1} / ${b.rounds}`});
+          if(i<b.exs.length-1) restStep(b.restIn,'種目間');
+        });
+        if(r<b.rounds-1) restStep(b.rest,'ラウンド間');
+      }
+    } else if(b.type==='pair'){
+      for(let s=0;s<b.sets;s++){
+        b.exs.forEach((ex,i)=>{
+          push({kind:'rep', ex, reps:b.reps, setLabel:`ペア ${s+1} / ${b.sets}`});
+          if(i<b.exs.length-1) restStep(b.restIn,'種目間');
+        });
+        if(s<b.sets-1) restStep(b.rest,'ペア後');
+      }
+    }
+  });
+  while(steps.length && steps[steps.length-1].kind==='rest') steps.pop();
+  steps.push({kind:'done'});
+  return steps;
+}
+
+function execStopTimer(){ if(execTimerId){ clearInterval(execTimerId); execTimerId=null; } }
+
+function beep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(), gn = ctx.createGain();
+    o.frequency.value = 880; o.connect(gn); gn.connect(ctx.destination);
+    gn.gain.setValueAtTime(0.18, ctx.currentTime);
+    gn.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.4);
+    o.start(); o.stop(ctx.currentTime+0.4);
+  }catch(e){}
+}
+
+function execRingSet(pct, restMode){
+  const C = 2*Math.PI*90;
+  const fg = $('#execRingFg');
+  fg.style.strokeDasharray = `${C}`;
+  fg.style.strokeDashoffset = `${C*(1-Math.max(0,Math.min(1,pct)))}`;
+  fg.classList.toggle('rest', !!restMode);
+}
+
+function execRenderStep(){
+  execStopTimer();
+  const step = execSteps[execIdx];
+  $('#execProgress').textContent = `${Math.min(execIdx+1, execSteps.length-1)} / ${execSteps.length-1}`;
+  $('#execPrev').disabled = execIdx===0;
+
+  if(step.kind==='done'){
+    $('#execSetLabel').textContent = '';
+    $('#execExName').textContent = 'お疲れさまでした';
+    $('#execExSub').textContent = 'この日のメニューは以上です。';
+    $('#execLabel').textContent = '完了';
+    $('#execBig').textContent = '✓';
+    execRingSet(1,false);
+    $('#execControls').innerHTML = '';
+    $('#execSkip').disabled = true;
+    return;
+  }
+  $('#execSkip').disabled = false;
+
+  if(step.kind==='rest'){
+    $('#execSetLabel').textContent = step.label;
+    $('#execExName').textContent = '休憩';
+    $('#execExSub').textContent = '次のセットまで';
+    $('#execLabel').textContent = '秒';
+    execSecTotal = Math.max(1, step.sec); execSecLeft = step.sec;
+    $('#execBig').textContent = execSecLeft;
+    execRingSet(execSecLeft/execSecTotal, true);
+    $('#execControls').innerHTML = `<button class="exec-adj" id="execMinus10">-10秒</button><button class="exec-adj" id="execPlus10">+10秒</button>`;
+    $('#execMinus10').onclick = ()=>{ execSecLeft = Math.max(0, execSecLeft-10); $('#execBig').textContent=execSecLeft; execRingSet(execSecLeft/execSecTotal,true); };
+    $('#execPlus10').onclick = ()=>{ execSecLeft += 10; execSecTotal = Math.max(execSecTotal, execSecLeft); $('#execBig').textContent=execSecLeft; execRingSet(execSecLeft/execSecTotal,true); };
+    if(step.sec>0) execTimerId = setInterval(()=>{
+      execSecLeft--;
+      $('#execBig').textContent = Math.max(0, execSecLeft);
+      execRingSet(Math.max(0,execSecLeft)/execSecTotal, true);
+      if(execSecLeft<=0){ execStopTimer(); beep(); execNext(); }
+    }, 1000);
+    return;
+  }
+
+  // レップ区間
+  $('#execSetLabel').textContent = step.setLabel||'';
+  $('#execExName').textContent = step.ex.ja;
+  $('#execExSub').textContent = `${MUSCLES[step.ex.m].ja} ・ ${step.reps||''}`;
+  const secTarget = parseSecFromReps(step.reps);
+  if(secTarget){
+    execSecTotal = secTarget; execSecLeft = secTarget;
+    $('#execBig').textContent = execSecLeft;
+    $('#execLabel').textContent = '秒キープ';
+    execRingSet(1,false);
+    $('#execControls').innerHTML = `<button class="exec-tap" id="execDoneBtn">完了</button>`;
+    $('#execDoneBtn').onclick = ()=> execNext();
+    execTimerId = setInterval(()=>{
+      execSecLeft--;
+      $('#execBig').textContent = Math.max(0, execSecLeft);
+      execRingSet(1-Math.max(0,execSecLeft)/execSecTotal, false);
+      if(execSecLeft<=0){ execStopTimer(); beep(); }
+    }, 1000);
+  } else {
+    const target = Math.max(1, Math.round(repsMidpoint(step.reps) ?? 8));
+    execRepCount = 0;
+    $('#execBig').textContent = '0';
+    $('#execLabel').textContent = `目標 ${target} 回`;
+    execRingSet(0,false);
+    $('#execControls').innerHTML = `<button class="exec-tap" id="execTapBtn">+1</button><button class="exec-adj" id="execUndoBtn">戻す</button>`;
+    $('#execTapBtn').onclick = ()=>{
+      execRepCount++;
+      $('#execBig').textContent = execRepCount;
+      execRingSet(execRepCount/target, false);
+      if(execRepCount>=target) setTimeout(execNext, 250);
+    };
+    $('#execUndoBtn').onclick = ()=>{
+      execRepCount = Math.max(0, execRepCount-1);
+      $('#execBig').textContent = execRepCount;
+      execRingSet(execRepCount/target, false);
+    };
+  }
+}
+
+function execNext(){ if(execIdx < execSteps.length-1) execIdx++; execRenderStep(); }
+function execPrev(){ if(execIdx>0) execIdx--; execRenderStep(); }
+
+function execOpen(di){
+  const day = currentWk && currentWk.plans[di];
+  if(!day) return;
+  execSteps = buildExecSteps(day);
+  execIdx = 0;
+  $('#execDayLabel').textContent = day.day.ja;
+  $('#dayPickModal').classList.remove('on');
+  $('#execView').classList.add('on');
+  execRenderStep();
+}
+function execClose(){ execStopTimer(); $('#execView').classList.remove('on'); }
+
+$('#startBtn').addEventListener('click', ()=>{
+  if(!currentWk) return;
+  $('#dayPickList').innerHTML = currentWk.plans.map((p,di)=>{
+    const n = p.groups.filter(g=>!g.blocks[0].blocked).length;
+    return `<button data-di="${di}" ${n===0?'disabled':''}><span>${p.day.ja}</span><small>${n}種目</small></button>`;
+  }).join('');
+  $('#dayPickModal').classList.add('on');
+});
+$('#dayPickList').addEventListener('click', ev=>{
+  const b = ev.target.closest('button[data-di]'); if(!b || b.disabled) return;
+  execOpen(+b.dataset.di);
+});
+$('#dayPickClose').addEventListener('click', ()=> $('#dayPickModal').classList.remove('on'));
+$('#dayPickModal').addEventListener('click', e=>{ if(e.target.id==='dayPickModal') $('#dayPickModal').classList.remove('on'); });
+$('#execClose').addEventListener('click', execClose);
+$('#execPrev').addEventListener('click', execPrev);
+$('#execSkip').addEventListener('click', execNext);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#execView').classList.contains('on')) execClose(); });
 
 // 保存された設定があれば復元（内部でrenderも呼ぶ）。なければ通常どおり初期表示する。
 if(!loadFromLocal()) render();
