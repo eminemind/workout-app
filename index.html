@@ -78,6 +78,19 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
   .results{padding:28px 0 80px}}
 
 .step{margin-bottom:30px}
+.mode-toggle{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);padding:4px}
+.mode-toggle button{flex:1;background:transparent;border:0;padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted);border-radius:var(--radius-pill)}
+.mode-toggle button.on{background:var(--ink);color:var(--on-dark)}
+.manual-day-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.manual-day-name{flex:1;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:8px 9px;font-size:13px;font-weight:600}
+.manual-day-acts{display:flex;gap:2px;flex:none}
+.manual-target-row{display:grid;grid-template-columns:56px repeat(3,1fr 34px);gap:4px;align-items:center;font-size:11px;margin-bottom:6px}
+.manual-target-row>span{font-weight:700;font-size:12px}
+.manual-target-row input{width:100%;background:var(--surface-2);border:1px solid var(--rule);border-radius:6px;padding:4px 3px;font-size:11px;text-align:center}
+.manual-target-row label{color:var(--muted)}
+#exPickList{max-height:320px;overflow-y:auto}
+#exPickList button small{color:var(--muted)}
+#exPickList button.act small{color:var(--on-dark);opacity:.75}
 .step-head{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
 .step-no{font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 800;font-size:12px;color:var(--muted);letter-spacing:.06em}
 .step-title{font-weight:700;font-size:14px}
@@ -584,6 +597,16 @@ input[type=number],input[type=text]{padding:8px 9px}
   <div class="cols">
     <aside class="panel">
       <div class="step">
+        <div class="step-head"><span class="step-no">00</span><span class="step-title">モード</span></div>
+        <div class="mode-toggle" id="modeToggle">
+          <button data-mode="auto" class="on">自動</button>
+          <button data-mode="manual">マニュアル</button>
+        </div>
+        <p class="hint" id="modeHint" style="margin-top:8px">設備・時間・目標から自動でメニューを組みます。</p>
+      </div>
+
+      <div id="autoSteps">
+      <div class="step">
         <div class="step-head"><span class="step-no">01</span><span class="step-title">トレーニング手法</span></div>
         <div class="field"><select id="method"></select></div>
         <div class="row" style="margin-top:10px"><div class="field hide" id="weekField">
@@ -627,6 +650,9 @@ input[type=number],input[type=text]{padding:8px 9px}
         <p class="hint" id="goalHint" style="margin-top:10px"></p>
         <p class="hint warn-hint hide" id="goalMinWarn" style="margin-top:6px"></p>
       </div>
+      </div><!-- /#autoSteps -->
+
+      <div id="manualPanel" class="hide"></div>
 
       <div class="step">
         <div class="step-head"><span class="step-no">05</span><span class="step-title">身体データ（目標スコア用）</span></div>
@@ -643,9 +669,11 @@ input[type=number],input[type=text]{padding:8px 9px}
         <p class="hint" id="bmiHint" style="margin-top:8px"></p>
       </div>
 
+      <div id="rerollBlock">
       <button class="reroll" id="reroll">種目を組み直す</button>
       <p class="hint" id="rerollHint" style="margin-top:6px"></p>
       <button class="resetsw hide" id="resetSwap">差し替え・スキップ・並び替えをすべて元に戻す</button>
+      </div>
 
       <div class="step save-step">
         <div class="step-head"><span class="step-no">06</span><span class="step-title">設定の保存</span></div>
@@ -722,6 +750,85 @@ input[type=number],input[type=text]{padding:8px 9px}
   </div>
 </div>
 
+<div class="modal" id="exPickModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3>種目を追加</h3><div class="sub" id="exPickSub">複数選ぶと、その場でスーパーセット／ラウンドとしてまとめて追加します。</div></div>
+    <button class="x" id="exPickClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="row">
+      <div class="field"><input type="text" id="exPickSearch" placeholder="種目名で検索"></div>
+      <div class="field"><select id="exPickMuscle"><option value="">すべての部位</option></select></div>
+    </div>
+    <button class="resetsw" id="exPickCustomBtn" style="margin-top:10px">＋ 種目を自作する</button>
+    <div id="exPickList" class="swaplist" style="margin-top:12px"></div>
+    <button class="fixbtn" id="exPickAdd" style="margin-top:14px">選んだ種目を追加する</button>
+  </div>
+</div></div>
+
+<div class="modal" id="blockEditModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3 id="beTitle">ブロックを編集</h3><div class="sub" id="beSub">—</div></div>
+    <button class="x" id="beClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="field"><label>手法</label>
+      <select id="beType">
+        <option value="straight">ストレート</option>
+        <option value="drop">ドロップセット</option>
+        <option value="restpause">レストポーズ</option>
+        <option value="pair">スーパーセット（ペア）</option>
+        <option value="round">ラウンド（3種目以上）</option>
+        <option value="cluster">クラスター</option>
+        <option value="myo">ミオレップ</option>
+        <option value="pyramid">ピラミッド</option>
+      </select>
+    </div>
+    <p class="hint" id="beTypeDesc" style="margin-top:6px"></p>
+    <div class="row" style="margin-top:10px">
+      <div class="field" id="beSetsField"><label>セット数</label><input type="number" id="beSets" min="1" max="20"></div>
+      <div class="field"><label>回数（レップ）</label><input type="text" id="beReps" placeholder="例：8–12"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>休憩 秒</label><input type="number" id="beRest" min="0" max="600" step="5"></div>
+      <div class="field"><label>努力係数</label>
+        <select id="beEffort">
+          <option value="max">限界まで（RIR0-1）</option>
+          <option value="normal" selected>通常（RIR2-3）</option>
+          <option value="submax">非限界</option>
+        </select>
+      </div>
+    </div>
+    <div class="row hide" id="beExtraRow" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>eff係数の上書き（空欄なら自動計算）</label><input type="number" id="beEffOverride" min="0" step="0.05" placeholder="例：1.8"></div>
+    </div>
+    <p class="hint" style="margin-top:6px">eff係数は「有効セット換算」に使う推定値です。既定値が実感と合わなければ、ここで直接書き換えられます。</p>
+    <button class="fixbtn" id="beSave" style="margin-top:14px">保存する</button>
+    <button class="resetsw" id="beDelete" style="margin-top:8px">このブロックを削除</button>
+  </div>
+</div></div>
+
+<div class="modal" id="customExModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3>種目を自作する</h3><div class="sub">メニューに無い種目を追加できます。</div></div>
+    <button class="x" id="customExClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div class="field"><label>種目名</label><input type="text" id="ceName" placeholder="例：ケーブルフロントレイズ"></div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>部位</label><select id="ceMuscle"></select></div>
+      <div class="field"><label>サブグループ（任意）</label><input type="text" id="ceSub" placeholder="例：side"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>種目タイプ</label><select id="ceCompound"><option value="0">アイソレーション</option><option value="1">コンパウンド</option></select></div>
+      <div class="field"><label>重量欄の意味</label>
+        <select id="ceLoadUnit">
+          <option value="single">single（バーベル・マシン等）</option>
+          <option value="pair">pair（両手にダンベル1個ずつ）</option>
+          <option value="bw">bw（自重が主体）</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>詳細部位（任意）</label><input type="text" id="ceDetail" placeholder="例：三角筋前部"></div>
+    <button class="fixbtn" id="ceSave" style="margin-top:14px">この種目を追加する</button>
+  </div>
+</div></div>
+
 <div class="modal" id="swapModal"><div class="sheet" role="dialog" aria-modal="true">
   <div class="sheet-head"><div><h3 id="sTitle">種目を差し替える</h3><div class="sub" id="sSub">—</div></div>
     <button class="x" id="sClose" aria-label="閉じる">&times;</button></div>
@@ -790,7 +897,14 @@ const BLOCK = {
   round:    {ja:'ラウンド',     eff:0.85, desc:'複数種目を1セットずつ連続。1周＝1ラウンド'},
   restpause:{ja:'レストポーズ', eff:2.60, desc:'限界→短い停止→再開を繰り返して1本'},
   drop:     {ja:'ドロップ',     eff:1.90, desc:'限界後に重量を落として継続、休まず段階を下る'},
-  pair:     {ja:'ペア',         eff:0.95, desc:'2種目を交互に。ペアの後だけ休む'}
+  pair:     {ja:'ペア',         eff:0.95, desc:'2種目を交互に。ペアの後だけ休む'},
+  /* マニュアルモード用に追加。係数はいずれも他の手法と同じく推定値——
+     マニュアルモードでは各ブロックのeff（有効セット換算係数）を
+     ユーザーが直接上書きできるようにしてあるので、この既定値が
+     合わないと感じたら数値そのものを書き換えられる。 */
+  cluster:  {ja:'クラスター',   eff:1.70, desc:'少レップの塊に分け、短い休憩を挟みながら継続'},
+  myo:      {ja:'ミオレップ',   eff:2.20, desc:'限界セットの後、短休憩を挟んで少レップを繰り返す'},
+  pyramid:  {ja:'ピラミッド',   eff:1.10, desc:'セットごとに重量・レップを変えて段階的に進める'}
 };
 const FAILURE_BONUS = 1.5;
 /* 逆方向の補正：明示的に「限界まで追い込まない」ことを手法自体が定義している場合の割引。
@@ -1581,8 +1695,23 @@ function makeBlock(spec, exs, ctx){
       b.phys = exs.length*b.sets;
       b.sec  = b.sets*(exs.length*W + b.restIn) + b.sets*r;
       b.detail = `2種目を交互に${b.sets}周 ・ 種目間は休憩なし、ペア後 ${r}秒`; break;
+    case 'cluster':
+      b.chunks=spec.chunks||4; b.pause=spec.pause||20; b.phys=1;
+      b.sec = b.chunks*Math.round(W*0.5) + (b.chunks-1)*b.pause + r;
+      b.detail = `${b.chunks}つの塊に分け、休憩${b.pause}秒を挟みながら継続 ・ ブロック後 ${r}秒`; break;
+    case 'myo':
+      b.myoReps=spec.myoReps||5; b.myoRounds=spec.myoRounds||4; b.pause=spec.pause||15; b.phys=1;
+      b.sec = W + b.myoRounds*(Math.round(W*0.4)+b.pause) + r;
+      b.detail = `限界セットの後、${b.pause}秒休憩を挟みながら${b.myoReps}回前後を${b.myoRounds}回追加 ・ ブロック後 ${r}秒`; break;
+    case 'pyramid':
+      b.steps=spec.steps||4; b.phys=b.steps;
+      b.sec = b.steps*W + b.steps*r;
+      b.detail = `${b.steps}段階、セットごとに重量・レップを変える ・ 段階間 ${r}秒`; break;
   }
   b.eff = b.phys * BLOCK[spec.type].eff * (spec.toFailure ? FAILURE_BONUS : 1) * (spec.submax ? SUBMAX_DISCOUNT : 1);
+  /* マニュアルモード：ユーザーがeff（有効セット換算係数）を直接指定していれば、
+     推定値による計算結果を無視してそちらを使う。 */
+  if(spec.effOverride!=null && !isNaN(spec.effOverride)) b.eff = +spec.effOverride;
   if(spec.toFailure){
     /* 本番1セットの前には、段階的に重量を上げるウォームアップが要る。
        これを時間計算から省くと、実際より大幅に短く見えてしまう。 */
@@ -1979,6 +2108,11 @@ function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWei
    6. 画面
    ============================================================ */
 let selected = new Set(DEFAULT_ON), seed = 1, lastMissingEq = [], currentWk = null, currentMethod = null;
+/* マニュアルモード：日/ブロックはユーザーが直接組み立てる。既存のEX[]と
+   衝突しないよう、自作種目のidは"u_"を前置する。 */
+let appMode = 'auto';
+let manualPlan = { days: [] };
+let manualCustomEx = [];
 const $ = s => document.querySelector(s);
 const rnd = n => Math.round(n*10)/10;
 
@@ -2012,7 +2146,8 @@ $('#fixEquip').addEventListener('click',()=>{
   paintEquip(); render();
 });
 
-function render(){
+function render(){ if(appMode==='manual'){ renderManual(); return; } renderAuto(); }
+function renderAuto(){
   const method = METHODS.find(m=>m.id===$('#method').value);
   const week = +$('#week').value;
   $('#weekField').classList.toggle('hide', !method.presetWeeks);
@@ -2277,6 +2412,8 @@ function drawMenu({method, wk, mins}){
               <button class="ord-b" data-act="blk" data-di="${p.di}" data-bi="${g.bi}" data-dir="down" ${gi===nBlk-1?'disabled':''} title="この種目（ブロック）を1つ後ろに">▼</button>
             </span>`:''}
             ${b.manual?`<button class="ord-b del" data-act="delmanual" data-di="${p.di}" data-bi="${g.bi}" title="この手動追加を削除">✕</button>`:''}
+            ${method.id==='manual'?`<button class="ord-b" data-act="editblk" data-di="${p.di}" data-bi="${g.bi}" title="このブロックを編集">✎</button>
+            <button class="ord-b del" data-act="delblk" data-di="${p.di}" data-bi="${g.bi}" title="このブロックを削除">✕</button>`:''}
           </div>
           <div class="ex-list" data-di="${p.di}" data-bi="${g.bi}">
           ${b.exs.map((ex,i)=>`
@@ -2299,8 +2436,8 @@ function drawMenu({method, wk, mins}){
                   <button class="ord-b sm" data-act="ex" data-di="${p.di}" data-bi="${g.bi}" data-orig="${(b.origIds&&b.origIds[i])||ex.id}" data-dir="up" ${i===0?'disabled':''} title="この種目を1つ前に">▲</button>
                   <button class="ord-b sm" data-act="ex" data-di="${p.di}" data-bi="${g.bi}" data-orig="${(b.origIds&&b.origIds[i])||ex.id}" data-dir="down" ${i===b.exs.length-1?'disabled':''} title="この種目を1つ後ろに">▼</button>
                 `:''}
-                <button class="ex-swap${b.blocked&&!available(ex)?' alert':''}" data-key="${(b.keys&&b.keys[i])||''}" data-m="${ex.m}" data-cur="${ex.id}">差し替え</button>
-                ${b.exs.length===1?`<button class="ex-edit" data-act="edit" data-di="${p.di}" data-bi="${g.bi}" title="セット数・レップを編集">編集</button>`:''}
+                ${method.id==='manual'?'':`<button class="ex-swap${b.blocked&&!available(ex)?' alert':''}" data-key="${(b.keys&&b.keys[i])||''}" data-m="${ex.m}" data-cur="${ex.id}">差し替え</button>`}
+                ${(method.id!=='manual' && b.exs.length===1)?`<button class="ex-edit" data-act="edit" data-di="${p.di}" data-bi="${g.bi}" title="セット数・レップを編集">編集</button>`:''}
                 <button class="ex-vid${CLIP[ex.id]?' has-clip':''}" data-ex="${ex.id}" title="${CLIP[ex.id]?'解説動画あり：'+CLIP[ex.id][0].by:'解説動画は未登録'}">フォーム</button>
               </div>
             </div>`).join('')}
@@ -2313,7 +2450,7 @@ function drawMenu({method, wk, mins}){
     </article>`;
   }).join('');
   const dragHint = ' ⠿をドラッグするか▲▼で、種目の順番を自分の好みに並び替えられます。「＋ 種目を追加」で種目を増やせます（時間・収支も再計算されます）。';
-  $('#menu').innerHTML=`<h2>週間メニュー<span>${wk.planLabel||method.ja}${method.by!=='—'?' / '+method.by:''}${wk.isPreset?' ・ プリセット':' ・ 自動生成'}</span></h2>`
+  $('#menu').innerHTML=`<h2>週間メニュー<span>${wk.planLabel||method.ja}${method.by!=='—'?' / '+method.by:''}${wk.isManual?'':wk.isPreset?' ・ プリセット':' ・ 自動生成'}</span></h2>`
     + (wk.schedNote
         ? `<p class="rotnote"><b>${wk.rot}種類のワークアウトを、週${rnd(wk.spw)}回で回します。</b>${wk.schedNote}。以下は<b>種類の一覧</b>であって、週の並びではありません。${dragHint}</p>`
         : `<p class="rotnote">${dragHint}</p>`)
@@ -2437,6 +2574,7 @@ $('#menu').addEventListener('click',ev=>{
   const b=ev.target.closest('.ex-edit'); if(!b) return;
   const di=+b.dataset.di, biStr=b.dataset.bi;
   if(!currentWk || !currentMethod) return;
+  if(currentMethod.id==='manual'){ openBlockEditor(di, biStr); return; }
   const day = currentWk.plans[di]; if(!day) return;
   const grp = day.groups.find(g=>g.bi===biStr); if(!grp) return;
   const blk = grp.blocks[0];
@@ -2486,6 +2624,15 @@ $('#menu').addEventListener('click',ev=>{
       Object.keys(weightOv).forEach(k=>{ if(k.startsWith(prefix)) delete weightOv[k]; });
     }
     render(); return;
+  }
+
+  if(b.dataset.act==='editblk'){ openBlockEditor(di, b.dataset.bi); return; }
+  if(b.dataset.act==='delblk'){
+    const dayObj = manualPlan.days[di]; if(!dayObj) return;
+    const idx = +b.dataset.bi;
+    if(!confirm('このブロックを削除しますか？')) return;
+    dayObj.blocks.splice(idx,1);
+    saveManualPlan(); render(); return;
   }
 
   const dir=b.dataset.dir;
@@ -2551,6 +2698,7 @@ $('#resetSwap').addEventListener('click',()=>{overrides={};blockOrder={};exOrder
 let addDi = null;
 $('#menu').addEventListener('click',ev=>{
   const b = ev.target.closest('.add-ex-btn'); if(!b) return;
+  if(currentMethod && currentMethod.id==='manual'){ openExPicker(+b.dataset.di); return; }
   openAdd(+b.dataset.di);
 });
 function openAdd(di){
@@ -2821,7 +2969,9 @@ function collectState(){
     bSex: $('#bSex').value,
     bWeight: $('#bWeight').value,
     bHeight: $('#bHeight').value,
-    overrides, blockOrder, exOrder, manualAdds, setsRepsOv, weightOv
+    overrides, blockOrder, exOrder, manualAdds, setsRepsOv, weightOv,
+    appMode, manualPlan, manualCustomEx,
+    volumeTargets: (()=>{ try{ return JSON.parse(localStorage.getItem('workoutVolumeTargets'))||{}; }catch(e){ return {}; } })()
   };
 }
 /* strict=false（自動保存の復元）のときは静かに読み込む。
@@ -2848,6 +2998,13 @@ function applyState(data, strict){
   setsRepsOv  = (data.setsRepsOv  && typeof data.setsRepsOv==='object')  ? data.setsRepsOv  : {};
   weightOv    = (data.weightOv    && typeof data.weightOv==='object')    ? data.weightOv    : {};
 
+  if(data.appMode==='manual' || data.appMode==='auto') appMode = data.appMode;
+  if(data.manualPlan && Array.isArray(data.manualPlan.days)) manualPlan = data.manualPlan;
+  if(Array.isArray(data.manualCustomEx)){ manualCustomEx = data.manualCustomEx; manualCustomEx.forEach(ce=>{ EXBY[ce.id]=ce; }); }
+  if(data.volumeTargets && typeof data.volumeTargets==='object'){
+    try{ localStorage.setItem('workoutVolumeTargets', JSON.stringify(data.volumeTargets)); }catch(e){}
+  }
+  syncModeUI();
   render();
   return {ok:true, msg: verMismatch
     ? 'アプリの更新により保存形式が変わっているため、一部の設定は引き継げていない可能性があります。'
@@ -2939,15 +3096,15 @@ function buildExecSteps(day, di){
           repStep(ex, i, b.reps, `ラウンド ${r+1} / ${b.rounds}`);
           if(i<b.exs.length-1) restStep(b.restIn,'種目間');
         });
-        if(r<b.rounds-1) restStep(b.rest,'ラウンド間');
-      }
+        restStep(b.rest,'ラウンド間'); // 他のブロック種類（straight/drop/restpause）と同じく、
+      }                                // 最後の周のあとも休憩を入れる。日の最後尾ならまとめて自動で取り除かれる
     } else if(b.type==='pair'){
       for(let s=0;s<b.sets;s++){
         b.exs.forEach((ex,i)=>{
           repStep(ex, i, b.reps, `ペア ${s+1} / ${b.sets}`);
           if(i<b.exs.length-1) restStep(b.restIn,'種目間');
         });
-        if(s<b.sets-1) restStep(b.rest,'ペア後');
+        restStep(b.rest,'ペア後');
       }
     }
   });
@@ -3398,6 +3555,304 @@ function wireHistoryToggle(){
 $('#historyBtn').addEventListener('click', ()=>{ renderHistory(); $('#historyModal').classList.add('on'); });
 $('#historyClose').addEventListener('click', ()=> $('#historyModal').classList.remove('on'));
 $('#historyModal').addEventListener('click', e=>{ if(e.target.id==='historyModal') $('#historyModal').classList.remove('on'); });
+
+/* ============================================================
+   10. マニュアルモード（Phase 4）
+   種目・手法・セット/レップ/休憩・eff係数を全部自分で決める。
+   既存のcomposeMuscle等は一切通さず、manualPlan.daysがそのまま
+   出力になる。buildManualWeek()がbuildWeek()と同じ形（plans/groups/
+   blocks）を返すことで、drawMenu・スコア計算・実行モード・PDF出力を
+   一切書き換えずに再利用できる——currentMethodを{id:'manual',...}という
+   ただの「もう1つの手法」として扱っているだけ。 */
+
+function newManualDay(){ return {name:'新しい日', blocks:[]}; }
+
+function saveManualPlan(){
+  try{ localStorage.setItem('workoutManualPlan', JSON.stringify({days:manualPlan.days, customEx:manualCustomEx})); }catch(e){}
+}
+function loadManualPlan(){
+  try{
+    const raw = localStorage.getItem('workoutManualPlan');
+    if(raw){
+      const data = JSON.parse(raw);
+      manualPlan.days = Array.isArray(data.days) ? data.days : [];
+      manualCustomEx = Array.isArray(data.customEx) ? data.customEx : [];
+      manualCustomEx.forEach(ce=>{ EXBY[ce.id]=ce; });
+    }
+    const savedMode = localStorage.getItem('workoutAppMode');
+    if(savedMode==='manual' || savedMode==='auto') appMode = savedMode;
+  }catch(e){}
+}
+function saveManualMode(){ try{ localStorage.setItem('workoutAppMode', appMode); }catch(e){} }
+
+function registerCustomEx(ce){
+  ce.id = 'u_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  ce.req = [];
+  ce.start = ce.start || 30;
+  EXBY[ce.id] = ce;
+  manualCustomEx.push(ce);
+  saveManualPlan();
+  return ce;
+}
+
+function buildManualWeek(){
+  const plans = manualPlan.days.map((day,di)=>{
+    const groups = day.blocks.map((mb,bi)=>{
+      const exs = (mb.exIds||[]).map(id=>EXBY[id]).filter(Boolean);
+      if(!exs.length) return null;
+      const spec = {
+        type:mb.type, sets:mb.sets, reps:mb.reps, rest:mb.rest,
+        toFailure: mb.effort==='max', submax: mb.effort==='submax',
+        stages:mb.stages, minis:mb.minis, pause:mb.pause,
+        rounds:mb.rounds, restIn:mb.restIn,
+        chunks:mb.chunks, myoReps:mb.myoReps, myoRounds:mb.myoRounds, steps:mb.steps,
+        effOverride: mb.effOverride
+      };
+      const b = makeBlock(spec, exs, {workSec:40, rest:mb.rest||90, target:0});
+      b.keys=['']; b.swapped=exs.map(()=>false); b.origIds=exs.map(e=>e.id);
+      return {m:exs[0].m, blocks:[b], bi:String(bi)};
+    }).filter(Boolean);
+    const ordered = applyOrder(groups, blockOrder[dayKey('manual',0,di)], gr=>gr.bi);
+    const sec = ordered.reduce((s,g)=>s+g.blocks[0].sec,0);
+    return {day:{ja:day.name}, di, groups:ordered, sec};
+  });
+  const supply = {}; MORDER.forEach(m=>supply[m]=0);
+  plans.forEach(p=>p.groups.forEach(g=>{ supply[g.m] += g.blocks[0].eff; }));
+  return {plans, isPreset:0, isManual:true, missing:[], supply, planLabel:null};
+}
+
+function renderManual(){
+  const pseudoMethod = {id:'manual', ja:'マニュアル', by:'—', workSec:40, rest:null, pro:0, goal:null, presetWeeks:null};
+  currentMethod = pseudoMethod;
+  const wk = buildManualWeek();
+  currentWk = wk;
+  renderManualPanel();
+  drawMenu({method:pseudoMethod, wk, mins:9999});
+  $('#resetSwap').classList.add('hide');
+  drawFoot();
+  saveToLocal();
+}
+
+function renderManualPanel(){
+  const targets = {}; MORDER.forEach(m=> targets[m] = volumeTargetFor(m));
+  $('#manualPanel').innerHTML = `
+    <div class="step">
+      <div class="step-head"><span class="step-title">日を組み立てる</span></div>
+      <p class="hint">日を追加し、各日の下部にある「＋種目を追加」から種目を選びます。複数選ぶとその場でスーパーセット・ラウンドになります。ブロックの✎で手法・回数・eff係数を編集できます。</p>
+      <div id="manualDayList"></div>
+      <button class="resetsw" id="manualAddDay" style="margin-top:8px">＋ 日を追加</button>
+    </div>
+    <div class="step">
+      <div class="step-head"><span class="step-title">MEV / MAV / MRV（週あたりハードセット数）</span></div>
+      <p class="hint">部位ごとの目安。履歴の可視化グラフの目標ラインにもこの値を使います。既定値は一般的な目安なので、自分の記録を見ながら調整してください。</p>
+      <div id="manualTargets"></div>
+    </div>`;
+
+  $('#manualDayList').innerHTML = manualPlan.days.length ? manualPlan.days.map((d,di)=>`
+    <div class="manual-day-row">
+      <input type="text" class="manual-day-name" data-di="${di}" value="${d.name.replace(/"/g,'&quot;')}">
+      <span class="manual-day-acts">
+        <button class="ord-b" data-mday-act="up" data-di="${di}" ${di===0?'disabled':''} title="1つ前に">▲</button>
+        <button class="ord-b" data-mday-act="down" data-di="${di}" ${di===manualPlan.days.length-1?'disabled':''} title="1つ後ろに">▼</button>
+        <button class="ord-b del" data-mday-act="del" data-di="${di}" title="この日を削除">✕</button>
+      </span>
+    </div>`).join('') : `<p class="hint">まだ日がありません。「＋ 日を追加」から始めてください。</p>`;
+
+  $('#manualTargets').innerHTML = MORDER.map(m=>`
+    <div class="manual-target-row">
+      <span>${MUSCLES[m].ja}</span>
+      <input type="number" min="0" data-m="${m}" data-k="mev" value="${targets[m].mev}"><label>MEV</label>
+      <input type="number" min="0" data-m="${m}" data-k="mav" value="${targets[m].mav}"><label>MAV</label>
+      <input type="number" min="0" data-m="${m}" data-k="mrv" value="${targets[m].mrv}"><label>MRV</label>
+    </div>`).join('');
+}
+
+$('#manualPanel').addEventListener('click', ev=>{
+  if(ev.target.closest('#manualAddDay')){ manualPlan.days.push(newManualDay()); saveManualPlan(); render(); return; }
+  const dayBtn = ev.target.closest('[data-mday-act]');
+  if(dayBtn){
+    const di = +dayBtn.dataset.di, act = dayBtn.dataset.mdayAct;
+    if(act==='del'){ if(!confirm('この日を削除しますか？（中の種目もすべて削除されます）')) return; manualPlan.days.splice(di,1); }
+    else if(act==='up' && di>0){ [manualPlan.days[di-1],manualPlan.days[di]]=[manualPlan.days[di],manualPlan.days[di-1]]; }
+    else if(act==='down' && di<manualPlan.days.length-1){ [manualPlan.days[di+1],manualPlan.days[di]]=[manualPlan.days[di],manualPlan.days[di+1]]; }
+    saveManualPlan(); render();
+  }
+});
+$('#manualPanel').addEventListener('change', ev=>{
+  const nameInput = ev.target.closest('.manual-day-name');
+  if(nameInput){ manualPlan.days[+nameInput.dataset.di].name = nameInput.value.trim() || '名称未設定'; saveManualPlan(); render(); return; }
+  const t = ev.target.closest('[data-k]');
+  if(t && t.dataset.m){
+    let vt = {}; try{ vt = JSON.parse(localStorage.getItem('workoutVolumeTargets'))||{}; }catch(e){}
+    if(!vt[t.dataset.m]) vt[t.dataset.m] = {...DEFAULT_VOLUME_TARGETS[t.dataset.m]};
+    vt[t.dataset.m][t.dataset.k] = +t.value || 0;
+    try{ localStorage.setItem('workoutVolumeTargets', JSON.stringify(vt)); }catch(e){}
+  }
+});
+
+/* ---- 種目ピッカー（種目を選んでブロックとして追加） ---- */
+let exPickDi = null, exPickSelected = new Set();
+function allPickableExercises(){ return [...EX, ...manualCustomEx]; }
+function openExPicker(di){
+  exPickDi = di; exPickSelected = new Set();
+  $('#exPickMuscle').innerHTML = '<option value="">すべての部位</option>' + MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('');
+  $('#exPickSearch').value = '';
+  renderExPickList();
+  $('#exPickModal').classList.add('on');
+}
+function renderExPickList(){
+  const q = ($('#exPickSearch').value||'').trim();
+  const mf = $('#exPickMuscle').value;
+  const list = allPickableExercises().filter(e => (!mf || e.m===mf) && (!q || e.ja.includes(q)));
+  $('#exPickList').innerHTML = list.length ? list.map(e=>`
+    <button type="button" data-id="${e.id}" class="${exPickSelected.has(e.id)?'act':''}">
+      <span>${e.ja}${e.id.startsWith('u_')?' <small>(自作)</small>':''}</span><small>${MUSCLES[e.m].ja}</small>
+    </button>`).join('') : `<p class="hint">見つかりませんでした。</p>`;
+}
+$('#exPickSearch').addEventListener('input', renderExPickList);
+$('#exPickMuscle').addEventListener('change', renderExPickList);
+$('#exPickList').addEventListener('click', ev=>{
+  const b = ev.target.closest('button[data-id]'); if(!b) return;
+  const id = b.dataset.id;
+  if(exPickSelected.has(id)) exPickSelected.delete(id); else exPickSelected.add(id);
+  renderExPickList();
+});
+$('#exPickCustomBtn').addEventListener('click', ()=> $('#customExModal').classList.add('on'));
+$('#exPickClose').addEventListener('click', ()=> $('#exPickModal').classList.remove('on'));
+$('#exPickModal').addEventListener('click', e=>{ if(e.target.id==='exPickModal') $('#exPickModal').classList.remove('on'); });
+$('#exPickAdd').addEventListener('click', ()=>{
+  if(exPickDi==null || !exPickSelected.size) return;
+  const ids = [...exPickSelected];
+  const day = manualPlan.days[exPickDi]; if(!day) return;
+  const type = ids.length===1 ? 'straight' : ids.length===2 ? 'pair' : 'round';
+  day.blocks.push({
+    type, exIds:ids, sets:3, reps: ids.length>1?'10–12':'8–12', rest:90,
+    effort:'normal', effOverride:null,
+    restIn: type!=='straight' ? 10 : undefined,
+    rounds: type==='round' ? 3 : undefined
+  });
+  saveManualPlan();
+  $('#exPickModal').classList.remove('on');
+  render();
+});
+
+/* ---- 種目の自作 ---- */
+$('#ceMuscle').innerHTML = MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('');
+$('#customExClose').addEventListener('click', ()=> $('#customExModal').classList.remove('on'));
+$('#customExModal').addEventListener('click', e=>{ if(e.target.id==='customExModal') $('#customExModal').classList.remove('on'); });
+$('#ceSave').addEventListener('click', ()=>{
+  const name = $('#ceName').value.trim();
+  if(!name){ alert('種目名を入力してください。'); return; }
+  const ce = registerCustomEx({
+    ja:name, m:$('#ceMuscle').value, sub:$('#ceSub').value.trim()||null,
+    c:+$('#ceCompound').value, loadUnit:$('#ceLoadUnit').value,
+    detail:$('#ceDetail').value.trim()
+  });
+  $('#customExModal').classList.remove('on');
+  $('#ceName').value=''; $('#ceSub').value=''; $('#ceDetail').value='';
+  if($('#exPickModal').classList.contains('on')){ exPickSelected.add(ce.id); renderExPickList(); }
+  showToast(`「${name}」を追加しました`);
+});
+
+/* ---- ブロックの編集（手法・回数・eff係数） ---- */
+let blockEditTarget = null;
+const BLOCK_EXTRA_FIELDS = {
+  drop:      [{key:'stages',   label:'段階数',           min:2, max:6,  default:3}],
+  restpause: [{key:'minis',    label:'ミニセット数',      min:2, max:6,  default:3},
+              {key:'pause',    label:'停止秒',            min:5, max:60, default:18}],
+  round:     [{key:'rounds',   label:'ラウンド数',        min:2, max:8,  default:3},
+              {key:'restIn',   label:'種目間の秒数',      min:0, max:60, default:10}],
+  pair:      [{key:'restIn',   label:'種目間の秒数',      min:0, max:60, default:0}],
+  cluster:   [{key:'chunks',   label:'塊の数',            min:2, max:8,  default:4},
+              {key:'pause',    label:'塊間の秒数',        min:5, max:60, default:20}],
+  myo:       [{key:'myoReps',  label:'追加1回あたりのレップ目安', min:1, max:15, default:5},
+              {key:'myoRounds',label:'追加の回数',        min:1, max:8,  default:4},
+              {key:'pause',    label:'休憩秒',            min:5, max:60, default:15}],
+  pyramid:   [{key:'steps',    label:'段階数',            min:2, max:8,  default:4}]
+};
+function renderBlockExtraFields(mb){
+  const fields = BLOCK_EXTRA_FIELDS[mb.type] || [];
+  const row = $('#beExtraRow');
+  if(!fields.length){ row.classList.add('hide'); row.innerHTML=''; return; }
+  row.classList.remove('hide');
+  row.innerHTML = fields.map(f=>`<div class="field"><label>${f.label}</label><input type="number" id="beX_${f.key}" min="${f.min}" max="${f.max}" value="${mb[f.key] ?? f.default}"></div>`).join('');
+}
+function openBlockEditor(di, biStr){
+  const dayObj = manualPlan.days[di]; if(!dayObj) return;
+  const bi = +biStr;
+  const mb = dayObj.blocks[bi]; if(!mb) return;
+  blockEditTarget = {di, bi};
+  $('#beTitle').textContent = mb.exIds.map(id=>(EXBY[id]&&EXBY[id].ja)||id).join(' + ');
+  $('#beSub').textContent = dayObj.name;
+  $('#beType').value = mb.type;
+  $('#beTypeDesc').textContent = BLOCK[mb.type].desc;
+  $('#beSetsField').classList.toggle('hide', mb.type!=='straight');
+  $('#beSets').value = mb.sets ?? 3;
+  $('#beReps').value = mb.reps ?? '';
+  $('#beRest').value = mb.rest ?? 90;
+  $('#beEffort').value = mb.effort || 'normal';
+  $('#beEffOverride').value = mb.effOverride ?? '';
+  renderBlockExtraFields(mb);
+  $('#blockEditModal').classList.add('on');
+}
+$('#beType').addEventListener('change', ()=>{
+  const t = $('#beType').value;
+  $('#beTypeDesc').textContent = BLOCK[t].desc;
+  $('#beSetsField').classList.toggle('hide', t!=='straight');
+  renderBlockExtraFields({type:t});
+});
+$('#beClose').addEventListener('click', ()=> $('#blockEditModal').classList.remove('on'));
+$('#blockEditModal').addEventListener('click', e=>{ if(e.target.id==='blockEditModal') $('#blockEditModal').classList.remove('on'); });
+$('#beSave').addEventListener('click', ()=>{
+  if(!blockEditTarget) return;
+  const {di,bi} = blockEditTarget;
+  const mb = manualPlan.days[di] && manualPlan.days[di].blocks[bi]; if(!mb) return;
+  mb.type = $('#beType').value;
+  mb.sets = +$('#beSets').value || 3;
+  mb.reps = $('#beReps').value || '8–12';
+  mb.rest = +$('#beRest').value || 0;
+  mb.effort = $('#beEffort').value;
+  const ov = $('#beEffOverride').value;
+  mb.effOverride = ov==='' ? null : +ov;
+  (BLOCK_EXTRA_FIELDS[mb.type]||[]).forEach(f=>{
+    const el = document.getElementById('beX_'+f.key);
+    if(el) mb[f.key] = +el.value || f.default;
+  });
+  saveManualPlan();
+  $('#blockEditModal').classList.remove('on');
+  blockEditTarget = null;
+  render();
+});
+$('#beDelete').addEventListener('click', ()=>{
+  if(!blockEditTarget) return;
+  if(!confirm('このブロックを削除しますか？')) return;
+  const {di,bi} = blockEditTarget;
+  manualPlan.days[di].blocks.splice(bi,1);
+  saveManualPlan();
+  $('#blockEditModal').classList.remove('on');
+  blockEditTarget = null;
+  render();
+});
+
+/* ---- モード切替 ---- */
+function syncModeUI(){
+  $('#modeToggle').querySelectorAll('button').forEach(x=> x.classList.toggle('on', x.dataset.mode===appMode));
+  $('#modeHint').textContent = appMode==='manual'
+    ? '種目・手法・セット/レップ・休憩・eff係数を自分で組み立てます。設備の絞り込みや目標プリセットは使いません。'
+    : '設備・時間・目標から自動でメニューを組みます。';
+  $('#autoSteps').classList.toggle('hide', appMode==='manual');
+  $('#manualPanel').classList.toggle('hide', appMode!=='manual');
+  $('#rerollBlock').classList.toggle('hide', appMode==='manual');
+}
+$('#modeToggle').addEventListener('click', ev=>{
+  const b = ev.target.closest('button[data-mode]'); if(!b) return;
+  appMode = b.dataset.mode;
+  syncModeUI();
+  saveManualMode();
+  render();
+});
+loadManualPlan();
+syncModeUI();
 
 if(!loadFromLocal()) render();
 </script>
