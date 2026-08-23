@@ -701,9 +701,12 @@ const LOADUNIT = {
 };
 EX.forEach(e=> e.loadUnit = LOADUNIT[e.id] || 'single');
 
-/* サブグループ。arm/shoulder/legsは「同じ大分類でも実際は異なる筋を狙う種目」が
-   混在しており、標準の自動生成がこれを区別せず選ぶと、二頭筋が丸ごと抜けたり
-   スクワット系が一切選ばれなかったりする（composeMuscleのサブグループ振り分けで使用）。
+/* サブグループ。arm/shoulder/legs/gluteは「同じ大分類でも実際は異なる筋・動きを
+   狙う種目」が混在しており、標準の自動生成がこれを区別せず選ぶと、二頭筋が
+   丸ごと抜けたり、スクワット系が一切選ばれなかったり、RDLとRDL（臀部狙い）の
+   ような実質同じ動きのペアが両方選ばれたりする（composeMuscleのサブグループ
+   振り分けで使用）。legsとgluteは種目プールを共有するため（buildWeek参照）、
+   同じ動きのパターンは同じタグにして、カテゴリをまたいだ重複も防ぐ。
    DETAILの記述と矛盾しないよう、その内容に沿って分類している。 */
 const SUBGROUP = {
   bcurl:'biceps', ez_curl:'biceps', drag_curl:'biceps', preacher_curl:'biceps',
@@ -713,10 +716,18 @@ const SUBGROUP = {
   btn_press:'side', side:'side', clr:'side', upright:'side',
   rear:'rear', rear_pec:'rear',
   shrug:'trap',
+  // スクワット・プレス系（膝主導）
   sq:'quad', front_sq:'quad', hack_sq:'quad', sissy:'quad', lp:'quad',
   bsq:'quad', lunge:'quad', lext:'quad', bwsq:'quad',
-  rdl:'ham', sldl:'ham', lcurl:'ham',
-  calf_raise:'calf'
+  lp_high:'quad', step_up:'quad', sumo_sq:'quad',
+  // ヒンジ系（股関節主導）。RDL／RDL（臀部狙い）はここで同じタグにして重複を防ぐ
+  rdl:'hinge', sldl:'hinge', rdl_g:'hinge', sumo_dl:'hinge', pull_through:'hinge',
+  lcurl:'ham',
+  calf_raise:'calf',
+  // ヒップスラスト・ブリッジ系
+  hip_thrust:'hipthrust', db_hipthrust:'hipthrust', gbridge:'hipthrust', bsq_g:'hipthrust',
+  // 臀部アイソレーション・追い込み系
+  cable_kick:'iso_glute', abduction:'iso_glute', band_abd:'iso_glute', frog:'iso_glute', hyper_g:'iso_glute'
 };
 EX.forEach(e=> e.sub = SUBGROUP[e.id] || null);
 
@@ -1357,8 +1368,15 @@ function composeMuscle({method, plan, pool, target, secBudget, hardCap, rest, se
   const blocks=[]; let eff=0, sec=0; const used=new Set(weekUsed||[]);
   const hasSub = pool.some(e=>e.sub);
   const ordered = hasSub ? selectionOrder(pool, salt, seed, weekUsedSub) : orderPicks(pool, salt, seed);
-  let i=0;
-  const next=()=>{while(i<ordered.length&&used.has(ordered[i].id))i++;return ordered[i]||null;};
+  /* 今週まだ登場していないサブグループを原則として優先し、無ければ既出のサブグループも許可する
+     （2段階：1段目で見つからない時だけ2段目にフォールバック）。1段目だけだと、legs/gluteのように
+     プールを共有する部位同士で、RDLと「RDL（臀部狙い）」のような同じ型の種目が同じ日に
+     両方選ばれてしまう。枠が余って空くよりは、型が重複しても埋める方を優先する。 */
+  const next=()=>{
+    return ordered.find(e=>!used.has(e.id) && !(weekUsedSub && e.sub && weekUsedSub.has(e.sub)))
+        || ordered.find(e=>!used.has(e.id))
+        || null;
+  };
   const push=b=>{ if(!b||sec+b.sec>hardCap||sec+b.sec>secBudget&&blocks.length) return false;
                   blocks.push(b);eff+=b.eff;sec+=b.sec;return true; };
   while(eff<target && blocks.length<(plan.maxBlocks||3)){
@@ -1578,22 +1596,37 @@ function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWei
   }
 
   // 標準：自動生成
-  const poolByMuscle={}; MORDER.forEach(m=>poolByMuscle[m]=EX.filter(e=>e.m===m&&available(e)));
+  /* legsとgluteはカテゴリ（目標の重み付け・週の分割）は別のまま、
+     種目の候補プールだけ共有する。「脚」と「臀部」は本来ひとつながりの
+     筋群で、種目を分けて管理する意味が薄い一方、目標ごとの重み付け
+     （例：お尻重点プログラムのglute need）は独立して残したいため。 */
+  const POOL_SHARE = {legs:['legs','glute'], glute:['legs','glute']};
+  const poolByMuscle={}; MORDER.forEach(m=>{
+    const src = POOL_SHARE[m] || [m];
+    poolByMuscle[m]=EX.filter(e=>src.includes(e.m)&&available(e));
+  });
   const split = SPLITS[days];
-  /* 部位が週内で複数日にまたがる場合（3分割の腕：プッシュ＋プル等）に、
-     同じ種目・同じサブグループばかり選ばれるのを防ぐための週単位の記録 */
-  const weekUsed={}, weekUsedSub={}; MORDER.forEach(m=>{weekUsed[m]=new Set(); weekUsedSub[m]=new Set();});
+  /* 同じ種目そのものの重複は週単位で防ぐ（3分割の腕：プッシュ＋プル等で
+     同じ種目が2回出ないように）。一方でサブグループ（型）の重複防止は
+     日単位に留める——週単位にすると、週に2回ある脚の日で片方が
+     ヒップスラストを使った後、もう片方の日で「型が全部使用済み」となり、
+     結局RDLと「RDL（臀部狙い）」を同日にまとめて選ぶ皮肉な結果になる。
+     スクワットを週2回やること自体は普通なので、日をまたぐ型の反復は許容する。 */
+  const weekUsed={}; MORDER.forEach(m=>weekUsed[m]=new Set());
+  weekUsed.glute = weekUsed.legs;
   const appear={}; MORDER.forEach(m=>appear[m]=split.filter(d=>d.m.includes(m)).length||0);
   const plans = split.map((d,di)=>{
     const need=d.m.map(m=>goal.need[m]/(appear[m]||1));
     const sum=need.reduce((a,b)=>a+b,0)||1;
     let carry=0, remaining=secPerDay;
+    const daySub={}; MORDER.forEach(m=>daySub[m]=new Set());
+    daySub.glute = daySub.legs; // legs/gluteはプールを共有するので、型の重複防止も同日内で共有する
     const groups=d.m.map((m,mi)=>{
       if(!poolByMuscle[m].length) return null;
       const share=secPerDay*(need[mi]/sum)+carry;
       const r=composeMuscle({method, plan:method.plan, pool:poolByMuscle[m], target:need[mi],
               secBudget:Math.min(share,remaining), hardCap:remaining, rest, seed, salt:di*7+mi,
-              weekUsed:weekUsed[m], weekUsedSub:weekUsedSub[m]});
+              weekUsed:weekUsed[m], weekUsedSub:daySub[m]});
       carry=share-r.sec; remaining-=r.sec;
       return {m, ...r};
     }).filter(g=>g&&g.blocks.length);
