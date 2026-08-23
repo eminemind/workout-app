@@ -3878,6 +3878,74 @@ function buildManualWeek(){
   return {plans, isPreset:0, isManual:true, missing:[], supply, planLabel:null};
 }
 
+/* 過去の実績（実行モードで記録した実際のセット）から、部位別の週平均
+   有効セット換算を出す。1セットごとのblockType・努力係数から、
+   makeBlockと同じ考え方（BLOCK係数×努力係数）で近似する。
+   レストポーズ／ドロップ／クラスター／ミオレップは本来1ブロック＝
+   phys1（複数ミニレップをまとめて1本と数える）だが、記録は
+   ミニレップ単位でしか残っていないため、この近似はそれらの手法を
+   実際よりやや多めに見積もる。目安であることを画面側にも明記する。 */
+function historicalAvgEff(){
+  const sessions = loadSessions();
+  const byWeek = {};
+  sessions.forEach(ss=>{
+    const wk = isoWeekKey(ss.date);
+    byWeek[wk] = byWeek[wk] || {};
+    ss.sets.forEach(st=>{
+      const blk = BLOCK[st.blockType] || BLOCK.straight;
+      const mult = st.effort==='max' ? FAILURE_BONUS : st.effort==='submax' ? SUBMAX_DISCOUNT : 1;
+      byWeek[wk][st.m] = (byWeek[wk][st.m]||0) + blk.eff*mult;
+    });
+  });
+  const weekKeys = Object.keys(byWeek);
+  const avg = {}; MORDER.forEach(m=>{
+    const total = weekKeys.reduce((s,wk)=>s+(byWeek[wk][m]||0), 0);
+    avg[m] = weekKeys.length ? total/weekKeys.length : 0;
+  });
+  return {avg, weeks: weekKeys.length};
+}
+
+/* マニュアルモード版の「週間 有効セット収支」。std/プロ仕様のdrawScorePanelと
+   同じ見た目を流用しつつ、中身をBMI由来の目標ではなく実績平均×1.05に差し替える。 */
+function drawManualScorePanel(wk){
+  const {avg, weeks} = historicalAvgEff();
+  const hasHistory = weeks>0 && MORDER.some(m=>avg[m]>0);
+  const target = hasHistory ? MORDER.reduce((o,m)=>(o[m]=avg[m]*1.05, o), {}) : null;
+  const supply = wk.supply;
+  const max = Math.max(1, ...MORDER.map(m=>supply[m]), ...(target?MORDER.map(m=>target[m]):[0]));
+  $('#unitNote').textContent = 'EFFECTIVE SETS / WEEK ・ マニュアル';
+  $('#railHost').innerHTML = `<div class="score-bars">${MORDER.map(m=>{
+    const v = rnd(supply[m]);
+    const pct = Math.max(2, v/max*100);
+    const tPct = target ? Math.min(100, target[m]/max*100) : null;
+    return `<div class="score-row">
+      <span class="score-label">${MUSCLES[m].ja}</span>
+      <div class="score-track">
+        <div class="score-fill" style="width:${pct}%;background:${MUSCLES[m].color}"></div>
+        ${tPct!=null?`<div class="score-target" style="left:${tPct}%" title="目安の目標 ${rnd(target[m])}"></div>`:''}
+      </div>
+      <span class="score-val">${v}${target?`<small>／${rnd(target[m])}</small>`:''}</span>
+    </div>`;
+  }).join('')}</div>`;
+  $('#legend').innerHTML = target
+    ? `<span class="lg"><span class="dot" style="background:var(--ink)"></span>今週の予定（ブロックの有効セット換算の合計）</span><span class="lg"><span class="score-target-lg"></span>目安の目標（過去${weeks}週の実績平均×1.05）</span>`
+    : '';
+  let html = `<span class="verdict-tag">週間 有効セット収支</span>`;
+  const notes = [];
+  if(target){
+    const short = MORDER.filter(m=>supply[m] < target[m]*0.9);
+    notes.push(`点線は<b>過去${weeks}週ぶんの実績平均に5%上乗せした目安の目標</b>です。実績は実行モードで記録した実際のセットから算出しています。記録が増えるほど精度が上がります。`);
+    notes.push(short.length
+      ? `目安の目標に届いていない部位：${short.map(m=>`${MUSCLES[m].ja}（${rnd(supply[m])}／${rnd(target[m])}）`).join('、')}`
+      : `全部位が目安の目標に届いています。`);
+  } else {
+    notes.push(`まだ実行モードでの記録がありません。記録が溜まると、その週平均に5%上乗せした目安の目標がここに表示されます。`);
+  }
+  notes.push(`有効セット換算は、手法ごとの係数（ドロップセット×1.9 等）を使った、このツール独自の目安です。ブロック編集の「きつさの補正値」で上書きしている種目はその値を反映します。`);
+  html += `<ul class="notes">${notes.map(n=>`<li>${n}</li>`).join('')}</ul>`;
+  $('#verdict').innerHTML = html;
+}
+
 function renderManual(){
   const pseudoMethod = {id:'manual', ja:'マニュアル', by:'—', workSec:40, rest:null, pro:0, goal:null, presetWeeks:null};
   currentMethod = pseudoMethod;
@@ -3885,6 +3953,7 @@ function renderManual(){
   currentWk = wk;
   renderManualPanel();
   setCredo(pseudoMethod);
+  drawManualScorePanel(wk);
   drawMenu({method:pseudoMethod, wk, mins:9999});
   $('#resetSwap').classList.add('hide');
   drawFoot();
