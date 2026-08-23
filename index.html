@@ -63,6 +63,12 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
 .attrib b{color:var(--ink);font-weight:700}
 .attrib .disc{display:block;font-size:11px;margin-top:3px}
 .masthead p{max-width:62ch;color:var(--muted);margin:12px 0 0;font-size:14px}
+.spec-details{margin-top:14px}
+.spec-details summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);list-style:none;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;gap:4px}
+.spec-details summary::-webkit-details-marker{display:none}
+.spec-details summary::before{content:'\203A';display:inline-block;transition:transform .2s}
+.spec-details[open] summary::before{transform:rotate(90deg)}
+.spec-details p{max-width:62ch;color:var(--muted);margin:10px 0 0;font-size:14px}
 
 .cols{display:grid;grid-template-columns:368px 1fr;align-items:start}
 .panel{border-right:1px solid var(--rule);padding:28px 28px 60px 0;position:sticky;top:0;max-height:100vh;overflow-y:auto}
@@ -477,7 +483,10 @@ body{background:transparent}
     <div class="eyebrow" id="tapZone">設備 &times; 時間 &times; 手法 → ブロックの列 → 有効セット</div>
     <h1 id="headline">設定を入れてください。</h1>
     <p class="attrib" id="attrib"></p>
-    <p>1回のトレーニングを「ブロックの列」として組み立てます。セット数は入力ではなく、ブロックを時間予算に詰めた結果として出てきます。標準は設備から自動生成、それ以外は考案者が好んだ種目によるプリセットです。</p>
+    <details class="spec-details">
+      <summary>仕様について</summary>
+      <p>1回のトレーニングを「ブロックの列」として組み立てます。セット数は入力ではなく、ブロックを時間予算に詰めた結果として出てきます。標準は設備から自動生成、それ以外は考案者が好んだ種目によるプリセットです。</p>
+    </details>
   </header>
 
   <div class="cols">
@@ -1969,10 +1978,8 @@ function setCredo(method){
     ? '<br><span class="tap-hint">ダブルタップで別の格言に切り替わります。</span>'
     : '';
   $('#attrib').innerHTML = c.who==='—'
-    ? `<b>${method.ja}</b><span class="disc">${q?'':'考案者のいる手法ではなく、目的から逆算した組み方です。'}${tapHint}</span>`
-    : q
-      ? `<b>${c.who}</b>${isStd?'':' ・ '+method.ja}<span class="disc">原文：<span class="hand-quote">${q.en}</span><br>${q.ref ? q.ref+'。' : '本人の言葉として広く流通しているものです。'}${isStd?'一次出典までは未確認です。':'一次出典（書籍・インタビュー）までは未確認です。'}${tapHint}</span>`
-      : `<b>${c.who}</b> ・ ${method.ja}<span class="disc">主張の要約です。逐語的な引用が確認できなかったため、本人の発言としては扱っていません。${tapHint}</span>`;
+    ? `<b>${method.ja}</b>${tapHint}`
+    : `<b>${c.who}</b>${isStd?'':' ・ '+method.ja}${tapHint}`;
 }
 
 function drawRail(need, needTotal, supply){
