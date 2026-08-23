@@ -82,6 +82,7 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
 .step-no{font-family:var(--display);font-variation-settings:'wdth' 125,'wght' 800;font-size:12px;color:var(--muted);letter-spacing:.06em}
 .step-title{font-weight:700;font-size:14px}
 .hint{font-size:12px;color:var(--muted);margin:-2px 0 10px;line-height:1.55}
+.warn-hint{color:var(--m-chest);font-weight:700}
 .hint b{color:var(--ink);font-weight:700}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--rule);background:var(--surface);padding:5px 10px;cursor:pointer;font-size:12px;user-select:none;transition:.12s}
@@ -551,6 +552,7 @@ input[type=number],input[type=text]{padding:8px 9px}
         <div class="step-head"><span class="step-no">04</span><span class="step-title">目指したい体型</span></div>
         <div class="field"><select id="goal"></select></div>
         <p class="hint" id="goalHint" style="margin-top:10px"></p>
+        <p class="hint warn-hint hide" id="goalMinWarn" style="margin-top:6px"></p>
       </div>
 
       <div class="step">
@@ -907,18 +909,22 @@ const CLIP = {
   }]
 };
 
+/* 目標は4つに絞っている。id自体は据え置きの箇所がある——
+   'pro'は考案者プリセット（Heavy Duty等11手法）がgoal:'pro'で目標を固定する
+   仕組みに使われており、idを変えるとその固定処理が壊れるため、
+   表示名だけ「ガチムチ」に変えてidはそのまま残した。同様に'glutefocus'は
+   お尻重点プログラム（プリセット手法）がgoal:'glutefocus'で参照している。
+   minDays/minMinsは、その目標で最低限必要と考える頻度・時間の目安。
+   下回ると警告を出す（checkGoalMinimums参照）。 */
 const GOALS = [
-  {id:'v',ja:'逆三角形（肩と背中を広く）',hint:'背中と肩に要求量を寄せています。',
-   need:{chest:10,back:16,shoulder:14,arm:8,legs:8,glute:4,core:4}},
-  {id:'bal',ja:'全身バランス肥大',hint:'全部位を均等に。',
-   need:{chest:12,back:12,shoulder:10,arm:10,legs:12,glute:8,core:6}},
-  {id:'slim',ja:'細マッチョ（絞って輪郭を出す）',hint:'要求量は最小。体脂肪を落とすのは食事側の仕事で、この計算の外です。',
+  {id:'maintain',ja:'体型維持',hint:'今の体型を保つための最小限の刺激。増量・減量どちらの土台にもなります。',
+   minDays:3,minMins:30,
+   need:{chest:6,back:8,shoulder:6,arm:5,legs:8,glute:5,core:5}},
+  {id:'slim',ja:'細マッチョ（絞って輪郭を出す）',hint:'維持より一段追い込みますが要求量は控えめです。体脂肪を落とすのは食事側の仕事で、この計算の外です。',
+   minDays:4,minMins:60,
    need:{chest:8,back:8,shoulder:8,arm:6,legs:8,glute:8,core:6}},
-  {id:'ath',ja:'下半身重視・アスリート型',hint:'脚と臀部に大きく配分します。',
-   need:{chest:8,back:12,shoulder:8,arm:4,legs:14,glute:12,core:8}},
-  {id:'str',ja:'筋力優先（重量を伸ばす）',hint:'コンパウンド中心。長いインターバルが前提です。',
-   need:{chest:10,back:10,shoulder:6,arm:4,legs:12,glute:8,core:6}},
-  {id:'pro',ja:'全身の筋力・筋量向上（プロ仕様）',hint:'プロのプリセットはこの目標に固定されます。全部位を高い水準まで引き上げる前提です。',
+  {id:'pro',ja:'ガチムチ（本格的な増量）',hint:'考案者プリセット（Heavy Duty、8×8等）はこの目標に固定されます。全部位を高い水準まで引き上げる前提です。',
+   minDays:5,minMins:60,
    need:{chest:14,back:16,shoulder:12,arm:12,legs:14,glute:6,core:6}},
   {id:'glutefocus',ja:'お尻重点（ヒップアップ）',hint:'臀部に要求量を大きく寄せ、上半身は姿勢を保つ最小限にしています。',
    need:{chest:4,back:8,shoulder:6,arm:4,legs:10,glute:20,core:8}}
@@ -1873,6 +1879,16 @@ function render(){
   const days=+$('#days').value, mins=+$('#mins').value, rest=+restSel.value;
   const goal=GOALS.find(g=>g.id===$('#goal').value);
   $('#goalHint').textContent = goal.hint;
+  const minWarn = $('#goalMinWarn');
+  const shortDays = goal.minDays && days < goal.minDays;
+  const shortMins = goal.minMins && mins < goal.minMins;
+  if(shortDays || shortMins){
+    minWarn.textContent = `⚠ ${goal.ja}には最低でも週${goal.minDays}日・1回${goal.minMins}分が目安です`
+      + (shortDays&&shortMins ? `（現在：週${days}日・${mins}分）` : shortDays ? `（現在：週${days}日）` : `（現在：${mins}分）`);
+    minWarn.classList.remove('hide');
+  } else {
+    minWarn.classList.add('hide');
+  }
 
   $('#methodCard').innerHTML = `<span class="by">${method.by}</span>${method.core}
     <span class="sig"><b>定番種目：</b>${method.sig}</span>`
@@ -2013,7 +2029,7 @@ function setCredo(method){
     : '';
   $('#attrib').innerHTML = c.who==='—'
     ? `<b>${method.ja}</b>${tapHint}`
-    : `<b>${c.who}</b>${isStd?'':' ・ '+method.ja}${tapHint}`;
+    : `<b>${c.who}</b>${isStd?'':' ・ '+method.ja}${q?`<span class="disc"><span class="hand-quote">${q.en}</span></span>`:''}${tapHint}`;
 }
 
 function drawRail(need, needTotal, supply){
