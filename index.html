@@ -706,8 +706,9 @@ input[type=number],input[type=text]{padding:8px 9px}
 
       <div class="step save-step">
         <div class="step-head"><span class="step-no">06</span><span class="step-title">設定の保存</span></div>
-        <p class="hint">この端末のブラウザには自動で保存されます。<b>別の端末やブラウザに引き継ぐには、書き出したファイルを読み込んでください。</b></p>
-        <button class="savebtn" id="exportBtn">設定を書き出す（ファイル保存）</button>
+        <p class="hint">この端末のブラウザには自動で保存されます。<b>別の端末やブラウザに引き継ぐには、書き出したファイルを読み込んでください。</b>トレーニング記録もここに含まれます。</p>
+        <button class="savebtn" id="exportBtn">ファイルに保存する</button>
+        <button class="savebtn outline hide" id="forgetFileBtn">保存先ファイルを選び直す</button>
         <button class="savebtn outline" id="importBtn">設定を読み込む</button>
         <input type="file" id="importFile" accept="application/json,.json" style="display:none">
         <p class="hint" id="saveHint" style="margin-top:8px"></p>
@@ -716,7 +717,7 @@ input[type=number],input[type=text]{padding:8px 9px}
 
     <main class="results">
       <section class="ledger">
-        <div class="ledger-head"><h2>週間 有効セット収支</h2><span class="unit" id="unitNote"></span></div>
+        <div class="ledger-head"><h2 id="ledgerTitle">週間 有効セット収支</h2><span class="unit" id="unitNote"></span></div>
         <div id="railHost"></div>
         <div class="legend" id="legend"></div>
         <div class="verdict" id="verdict"></div>
@@ -2246,12 +2247,14 @@ function renderAuto(){
 
   if(useScore){
     const bt = computeBodyTarget($('#bSex').value, +$('#bWeight').value, +$('#bHeight').value);
+    $('#ledgerTitle').textContent = '週間 スコア収支';
     $('#unitNote').textContent = `TRAINING LOAD SCORE ・ ${wk.planLabel || method.short}`;
     drawScorePanel(wk, bt);
     $('#bmiHint').innerHTML = bt
       ? `BMI ${bt.bmi.toFixed(1)}（基準値22との比で目標スコアを調整）`
       : `体重と身長を入力すると、部位ごとの目安の目標スコアが表示されます。`;
   } else {
+    $('#ledgerTitle').textContent = '週間 有効セット収支';
     $('#unitNote').textContent = `EFFECTIVE SETS / WEEK ・ ${wk.planLabel || method.short}`;
     drawRail(goal.need, needTotal, supplyTotal);
     drawLegend(goal.need, wk.supply);
@@ -3093,8 +3096,54 @@ function loadFromLocal(){
     return true;
   }catch(e){ return false; }
 }
-$('#exportBtn').addEventListener('click', ()=>{
-  const blob = new Blob([JSON.stringify(collectState(), null, 2)], {type:'application/json'});
+/* ファイルへの上書き保存（File System Access API）。
+   対応ブラウザ（Chrome/Edge等のデスクトップ・一部Android）では、
+   最初の1回だけ保存先を選べば、以降は同じファイルに上書きできる。
+   ハンドル自体はJSONにできないのでlocalStorageではなくIndexedDBに置く。
+   Safari・Firefox等の非対応ブラウザでは、従来どおり毎回新規ダウンロードに
+   自動で切り替わる（機能を検出して分岐するだけで、両方とも動く）。 */
+const FS_SUPPORTED = typeof window.showSaveFilePicker === 'function';
+let saveFileHandle = null;
+function openHandleDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open('workoutSaveHandleDB', 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore('handles');
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function storeHandle(handle){
+  try{
+    const db = await openHandleDB();
+    await new Promise((res,rej)=>{
+      const tx = db.transaction('handles','readwrite');
+      tx.objectStore('handles').put(handle, 'saveFile');
+      tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+    });
+  }catch(e){}
+}
+async function loadHandle(){
+  try{
+    const db = await openHandleDB();
+    return await new Promise((res,rej)=>{
+      const tx = db.transaction('handles','readonly');
+      const req = tx.objectStore('handles').get('saveFile');
+      req.onsuccess = ()=> res(req.result||null);
+      req.onerror = ()=> rej(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function forgetHandle(){
+  saveFileHandle = null;
+  try{ const db = await openHandleDB();
+    const tx = db.transaction('handles','readwrite');
+    tx.objectStore('handles').delete('saveFile');
+  }catch(e){}
+  $('#forgetFileBtn').classList.add('hide');
+  $('#saveHint').textContent = '保存先を解除しました。次回保存時に選び直します。';
+}
+function downloadAsNewFile(data){
+  const blob = new Blob([data], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const d = new Date(); const pad=n=>String(n).padStart(2,'0');
@@ -3102,8 +3151,44 @@ $('#exportBtn').addEventListener('click', ()=>{
   a.download = `workout-settings-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
-  $('#saveHint').textContent = 'ファイルを保存しました。他の端末では「設定を読み込む」からこのファイルを選んでください。';
+  $('#saveHint').textContent = FS_SUPPORTED
+    ? 'このブラウザでは保存先を維持できなかったため、新しいファイルとしてダウンロードしました。'
+    : 'ファイルを保存しました。他の端末では「設定を読み込む」からこのファイルを選んでください（このブラウザは同じファイルへの上書きに対応していません）。';
+}
+$('#exportBtn').addEventListener('click', async ()=>{
+  const data = JSON.stringify(collectState(), null, 2);
+  if(!FS_SUPPORTED){ downloadAsNewFile(data); return; }
+  try{
+    if(!saveFileHandle){
+      saveFileHandle = await window.showSaveFilePicker({
+        suggestedName: 'workout-settings.json',
+        types: [{description:'JSON', accept:{'application/json':['.json']}}]
+      });
+      await storeHandle(saveFileHandle);
+    }
+    const perm = await saveFileHandle.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted'){
+      const req = await saveFileHandle.requestPermission({mode:'readwrite'});
+      if(req !== 'granted') throw new Error('permission not granted');
+    }
+    const writable = await saveFileHandle.createWritable();
+    await writable.write(data);
+    await writable.close();
+    $('#forgetFileBtn').classList.remove('hide');
+    $('#saveHint').textContent = `${saveFileHandle.name} に上書き保存しました（次回からもこのファイルに上書きします）。`;
+    showToast('保存しました');
+  }catch(e){
+    if(e.name === 'AbortError') return; // ファイル選択をキャンセルした
+    saveFileHandle = null;
+    downloadAsNewFile(data);
+  }
 });
+$('#forgetFileBtn').addEventListener('click', forgetHandle);
+(async ()=>{
+  if(!FS_SUPPORTED) return;
+  const h = await loadHandle();
+  if(h){ saveFileHandle = h; $('#forgetFileBtn').classList.remove('hide'); }
+})();
 $('#importBtn').addEventListener('click', ()=> $('#importFile').click());
 $('#importFile').addEventListener('change', ev=>{
   const file = ev.target.files[0]; if(!file) return;
@@ -3931,6 +4016,7 @@ function drawManualScorePanel(wk){
   const hasHistory = weeks>0 && MORDER.some(m=>avg[m]>0);
   const target = hasHistory ? MORDER.reduce((o,m)=>(o[m]=avg[m]*1.05, o), {}) : null;
   const max = Math.max(1, ...MORDER.map(m=>raw[m]), ...(target?MORDER.map(m=>target[m]):[0]));
+  $('#ledgerTitle').textContent = '週間 スコア収支';
   $('#unitNote').textContent = 'TRAINING LOAD SCORE ・ マニュアル';
   $('#railHost').innerHTML = `<div class="score-bars">${MORDER.map(m=>{
     const v = Math.round(raw[m]);
