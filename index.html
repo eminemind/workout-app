@@ -1877,6 +1877,37 @@ function buildWeek({method, week, days, mins, rest, goal, seed, autoFit, bodyWei
       carry=share-r.sec; remaining-=r.sec;
       return {m, ...r};
     }).filter(g=>g&&g.blocks.length);
+
+    /* 部位の目標(need)を満たしても、選んだ時間より短く終わることがあった
+       （例：ガチムチ×60分×5分割の「プル」日が43分で終わる）。
+       目標はあくまで週の最低ライン（MEVに近い考え方）で、選んだ時間を
+       使い切る保証ではなかったため。ここで余った時間を追加種目で埋める。
+       composeMuscleと同じ選び方（サブグループの重複回避・週またぎ重複防止）
+       を踏襲するため、weekUsed/daySubをそのまま共有する。 */
+    if(autoFit){
+      let daySec = groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+b.sec,0),0);
+      const usedIds = new Set(groups.flatMap(g=>g.blocks.flatMap(b=>b.exs.map(e=>e.id))));
+      const fillerSpec = method.filler || {type:'straight',sets:3,reps:'10–12'};
+      for(let n=0; n<10; n++){
+        if(secPerDay - daySec < 200) break; // 1ブロック分の余裕も無ければ打ち切り
+        const m = d.m[n % d.m.length];
+        const pool = poolByMuscle[m];
+        if(!pool || !pool.length) continue;
+        const hasSub = pool.some(e=>e.sub);
+        const ordered = hasSub ? selectionOrder(pool, di*7+99+n, seed, daySub[m]) : orderPicks(pool, di*7+99+n, seed);
+        const cand = ordered.find(e=> !weekUsed[m].has(e.id) && !usedIds.has(e.id));
+        if(!cand) continue;
+        const fb = makeBlock(fillerSpec, [cand], {workSec:method.workSec, rest, target:0});
+        if(daySec + fb.sec > secPerDay) break;
+        fb.added = true;
+        daySec += fb.sec;
+        usedIds.add(cand.id);
+        weekUsed[m].add(cand.id);
+        if(cand.sub) daySub[m].add(cand.sub);
+        groups.push({m, blocks:[fb], eff:fb.eff, sec:fb.sec});
+      }
+    }
+
     // 自動生成側の差し替え・スキップ。プリセットと同じ「1グループ1ブロック」構造に平坦化し、並び替えも使えるようにする
     let bi=0;
     const flat=[];
