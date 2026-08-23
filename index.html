@@ -89,6 +89,10 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
 .manual-target-row input{width:100%;background:var(--surface-2);border:1px solid var(--rule);border-radius:6px;padding:4px 3px;font-size:11px;text-align:center}
 .manual-target-row label{color:var(--muted)}
 #exPickList{max-height:320px;overflow-y:auto}
+.be-ex-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2px}
+.be-ex-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);padding:5px 6px 5px 12px;font-size:12.5px}
+.be-ex-chip button{background:var(--rule);border:0;border-radius:50%;width:18px;height:18px;line-height:1;cursor:pointer;color:var(--ink);font-size:13px}
+.be-ex-chip button:disabled{opacity:.3;cursor:not-allowed}
 #exPickList button small{color:var(--muted)}
 #exPickList button.act small{color:var(--on-dark);opacity:.75}
 .step-head{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
@@ -527,6 +531,12 @@ input[type=number],input[type=text]{padding:8px 9px}
 .hist-mmark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--rule-strong)}
 .hist-sess{border-bottom:1px solid var(--rule);padding:10px 0;font-size:12.5px}
 .hist-sess:last-child{border-bottom:0}
+.hist-sess{cursor:pointer}
+.hist-sess-main{pointer-events:none}
+.hist-sess-del{display:none;margin-top:8px;background:var(--m-chest);color:var(--on-dark);border:0;border-radius:var(--radius-sm);padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer}
+.hist-sess.open .hist-sess-del{display:inline-block}
+.hist-detail{min-height:1.6em;border-top:1px dashed var(--rule);padding-top:6px;margin-top:2px}
+.chart-hit{cursor:pointer}
 .hist-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
 .hist-h:first-of-type{margin-top:0}
 .hist-toggle{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
@@ -768,7 +778,11 @@ input[type=number],input[type=text]{padding:8px 9px}
   <div class="sheet-head"><div><h3 id="beTitle">ブロックを編集</h3><div class="sub" id="beSub">—</div></div>
     <button class="x" id="beClose" aria-label="閉じる">&times;</button></div>
   <div class="sheet-body">
-    <div class="field"><label>手法</label>
+    <div class="field"><label>種目（ペア・ラウンドは複数種目が必要）</label>
+      <div id="beExList" class="be-ex-list"></div>
+      <button class="resetsw" id="beAddEx" style="margin-top:8px">＋ この組に種目を追加</button>
+    </div>
+    <div class="field" style="margin-top:14px"><label>手法</label>
       <select id="beType">
         <option value="straight">ストレート</option>
         <option value="drop">ドロップセット</option>
@@ -797,9 +811,9 @@ input[type=number],input[type=text]{padding:8px 9px}
     </div>
     <div class="row hide" id="beExtraRow" style="margin-top:10px"></div>
     <div class="row" style="margin-top:10px">
-      <div class="field"><label>eff係数の上書き（空欄なら自動計算）</label><input type="number" id="beEffOverride" min="0" step="0.05" placeholder="例：1.8"></div>
+      <div class="field"><label>きつさの補正値（空欄なら自動）</label><input type="number" id="beEffOverride" min="0" step="0.05" placeholder="例：1.8"></div>
     </div>
-    <p class="hint" style="margin-top:6px">eff係数は「有効セット換算」に使う推定値です。既定値が実感と合わなければ、ここで直接書き換えられます。</p>
+    <p class="hint" style="margin-top:6px"><b>普段は空欄のままでOKです。</b>アプリは手法ごとに「これくらいキツい」という数値（有効セット換算）を仮に置いています（例：ドロップセット×1.9、レストポーズ×2.6）。これはあくまで推定値なので、「自分の体感だとこの手法はもっとキツい／楽」と感じたら、ここに直接その数値を入れて上書きできます。数値が大きいほど「効いた扱い」が大きくなり、週間の集計に強く反映されます。</p>
     <button class="fixbtn" id="beSave" style="margin-top:14px">保存する</button>
     <button class="resetsw" id="beDelete" style="margin-top:8px">このブロックを削除</button>
   </div>
@@ -2971,7 +2985,7 @@ function collectState(){
     bHeight: $('#bHeight').value,
     overrides, blockOrder, exOrder, manualAdds, setsRepsOv, weightOv,
     appMode, manualPlan, manualCustomEx,
-    volumeTargets: (()=>{ try{ return JSON.parse(localStorage.getItem('workoutVolumeTargets'))||{}; }catch(e){ return {}; } })()
+    sessions: loadSessions()
   };
 }
 /* strict=false（自動保存の復元）のときは静かに読み込む。
@@ -3001,8 +3015,12 @@ function applyState(data, strict){
   if(data.appMode==='manual' || data.appMode==='auto') appMode = data.appMode;
   if(data.manualPlan && Array.isArray(data.manualPlan.days)) manualPlan = data.manualPlan;
   if(Array.isArray(data.manualCustomEx)){ manualCustomEx = data.manualCustomEx; manualCustomEx.forEach(ce=>{ EXBY[ce.id]=ce; }); }
-  if(data.volumeTargets && typeof data.volumeTargets==='object'){
-    try{ localStorage.setItem('workoutVolumeTargets', JSON.stringify(data.volumeTargets)); }catch(e){}
+  if(Array.isArray(data.sessions) && data.sessions.length){
+    // 端末間の復元用。同じidの記録は上書きせず、無ければ追加する（取り込みで消さない）
+    const existing = loadSessions();
+    const existingIds = new Set(existing.map(x=>x.id));
+    const merged = existing.concat(data.sessions.filter(x=>x && x.id && !existingIds.has(x.id)));
+    saveSessions(merged);
   }
   syncModeUI();
   render();
@@ -3344,18 +3362,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#execView').
 /* ============================================================
    9.6 履歴の可視化（Phase 2）
    すべて手書きSVG（外部ライブラリ不使用、単一HTML完結の制約のため）。
-   MEV/MAV/MRVの目標ラインは、まだ専用の設定UI（マニュアルモード側で
-   実装予定）が無いので、暫定の一般的な目安値を既定値として使う。
    ============================================================ */
-const DEFAULT_VOLUME_TARGETS = {
-  chest:{mev:6,mav:12,mrv:20}, back:{mev:8,mav:14,mrv:22}, shoulder:{mev:6,mav:12,mrv:20},
-  arm:{mev:6,mav:12,mrv:20}, legs:{mev:8,mav:14,mrv:22}, glute:{mev:4,mav:10,mrv:16}, core:{mev:0,mav:8,mrv:16}
-};
-function volumeTargetFor(m){
-  try{ const raw = localStorage.getItem('workoutVolumeTargets'); const custom = raw?JSON.parse(raw):null;
-    if(custom && custom[m]) return custom[m]; }catch(e){}
-  return DEFAULT_VOLUME_TARGETS[m];
-}
 
 /* 8週分・週4回のサンプルセッションを生成する（実データには一切触れない、表示専用）。
    重量は週を追うごとにゆるく右肩上がりにして、e1RM推移のグラフに動きが出るようにしている。 */
@@ -3410,15 +3417,17 @@ function isoWeekKey(dateStr){
   d.setDate(d.getDate()-day); return d.toISOString().slice(0,10);
 }
 
+/* タップ/ホバーで詳細を出すため、点には data-label を持たせる。
+   ネイティブの<title>だけだとスマホのタップでは出ないので、
+   クリック委譲で別途detail欄に文字を出す（呼び出し側で配線する）。 */
 function svgLineChart(series, opts){
   opts = opts||{};
   const W=opts.w||620, H=opts.h||200, pad={l:34,r:10,t:12,b:20};
-  const refLines = opts.refLines||[];
   const allPts = series.flatMap(s=>s.points);
   if(!allPts.length) return `<p class="hint">データがありません。</p>`;
   const xs = allPts.map(p=>p.x);
   const xMin=Math.min(...xs), xMax=Math.max(...xs);
-  const yMax = Math.max(1, ...allPts.map(p=>p.y), ...refLines.map(r=>r.y))*1.15;
+  const yMax = Math.max(1, ...allPts.map(p=>p.y))*1.15;
   const X = x => pad.l + (xMax>xMin ? (x-xMin)/(xMax-xMin) : 0.5) * (W-pad.l-pad.r);
   const Y = y => H-pad.b - (y/yMax)*(H-pad.t-pad.b);
   const gridY = [0,0.5,1].map(f=>{
@@ -3426,15 +3435,27 @@ function svgLineChart(series, opts){
     return `<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(val).toFixed(1)}" y2="${Y(val).toFixed(1)}" stroke="var(--rule)" stroke-width="1"/>`
       + `<text x="${pad.l-6}" y="${(Y(val)+3).toFixed(1)}" font-size="9" fill="var(--muted)" text-anchor="end">${val}</text>`;
   }).join('');
-  const refs = refLines.map(r=>`<line x1="${pad.l}" x2="${W-pad.r}" y1="${Y(r.y).toFixed(1)}" y2="${Y(r.y).toFixed(1)}" stroke="${r.color||'var(--muted)'}" stroke-width="1.5" stroke-dasharray="4 3"/>`
-    + `<text x="${W-pad.r}" y="${(Y(r.y)-3).toFixed(1)}" font-size="9" fill="${r.color||'var(--muted)'}" text-anchor="end">${r.label}</text>`).join('');
   const lines = series.map(s=>{
     if(!s.points.length) return '';
     const d = s.points.map((p,i)=> `${i===0?'M':'L'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
-    const dots = s.points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.6" fill="${s.color}"><title>${p.label||''}</title></circle>`).join('');
+    const dots = s.points.map(p=>{
+      const cx=X(p.x).toFixed(1), cy=Y(p.y).toFixed(1);
+      const label = (p.label||'').replace(/"/g,'&quot;');
+      // 見た目の点は小さく、タップ判定用の透明な円は大きくして押しやすくする
+      return `<circle cx="${cx}" cy="${cy}" r="10" fill="transparent" class="chart-hit" data-label="${label}"/>`
+           + `<circle cx="${cx}" cy="${cy}" r="2.6" fill="${s.color}" class="chart-hit" data-label="${label}" style="pointer-events:none"/>`;
+    }).join('');
     return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>${dots}`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block">${gridY}${refs}${lines}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block">${gridY}${lines}</svg>`;
+}
+/* クリック委譲：.chart-hitがある入れ物に対して1回呼べば、detail要素に文字を出す */
+function wireChartDetail(containerId, detailId){
+  const c = document.getElementById(containerId); if(!c) return;
+  c.addEventListener('click', ev=>{
+    const hit = ev.target.closest('.chart-hit'); if(!hit) return;
+    document.getElementById(detailId).textContent = hit.dataset.label || '';
+  });
 }
 
 function svgHeatmap(dayVolumes, weeksBack){
@@ -3453,7 +3474,8 @@ function svgHeatmap(dayVolumes, weeksBack){
       const v = dayVolumes[key]||0;
       const alpha = v ? Math.min(1, 0.18+0.82*(v/maxV)) : 0.07;
       const x = w*(cell+gap), y = d*(cell+gap);
-      cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="var(--ink)" opacity="${alpha.toFixed(2)}"><title>${key}${v?` ・ 約${Math.round(v).toLocaleString()}kg`:''}</title></rect>`;
+      const label = `${key}${v?` ・ 総ボリューム約${Math.round(v).toLocaleString()}kg`:' ・ 記録なし'}`;
+      cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="var(--ink)" opacity="${alpha.toFixed(2)}" class="chart-hit" data-label="${label}"/>`;
     }
   }
   const W=(weeksBack+1)*(cell+gap), H=7*(cell+gap);
@@ -3475,10 +3497,14 @@ function renderHistory(){
   let html = `<div class="hist-toggle">
     <label><input type="checkbox" id="histSampleToggle" ${historySampleMode?'checked':''}> サンプルデータで表示（実データには影響しません）</label>
   </div>`;
+  if(realAll.length){
+    html += `<button class="resetsw" id="histExportBtn" style="margin-bottom:16px">記録をエクスポート（分析・AI用ファイル）</button>`;
+  }
   if(!historySampleMode && !realAll.length){
     html += `<p class="hint">まだ記録がありません。実行モードで「セット完了」を押すと、ここに蓄積されていきます。上のチェックボックスで、データが溜まった時にどう見えるかのサンプルを確認できます。</p>`;
     $('#historyBody').innerHTML = html;
     wireHistoryToggle();
+    wireHistoryExport();
     return;
   }
 
@@ -3488,19 +3514,22 @@ function renderHistory(){
     <div><b>${Math.round(totalVolume).toLocaleString()}</b><span>総ボリューム(kg)</span></div>
   </div>`;
 
-  // 週次ハードセット数（部位別・選択式）＋MEV/MAV/MRV
+  // 週次ハードセット数（部位別・選択式）
   const weekKeys = [...new Set(sessions.map(ss=>isoWeekKey(ss.date)))].sort();
   html += `<h4 class="hist-h">週次ハードセット数（部位別・「限界まで」設定のみ）</h4>
+    <p class="hint">その週に「限界まで」で行ったセット数（種目数ではなくセット数）。タップすると詳しい数字が出ます。</p>
     <div class="row" style="margin-bottom:8px"><div class="field"><select id="histMuscleSel">${MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('')}</select></div></div>
     <div id="histMuscleChart"></div>
-    <div class="lg" style="margin-top:8px"><span class="dot" style="background:var(--ink)"></span>実績</div>`;
+    <p class="hint hist-detail" id="histMuscleDetail">グラフの点をタップすると、ここに詳細が出ます。</p>`;
 
   // e1RM推移（種目選択式）
   const exIdsWithData = [...new Set(sessions.flatMap(ss=>ss.sets.filter(st=>st.weightKg).map(st=>st.exId)))];
-  html += `<h4 class="hist-h">推定1RMの推移（Epley式：重量×(1+レップ÷30)）</h4>`;
+  html += `<h4 class="hist-h">推定1RMの推移</h4>
+    <p class="hint">「その重量・回数なら理論上1回だけなら挙げられるはず」という重さの推定値（Epley式：重量 ×（1 ＋ レップ数 ÷ 30））。例えば100kgを8回挙げられたら、推定1RMは約126.7kg。レップ数が違う日どうしでも力の伸びを比べられるようにするための指標です。タップで実際の重量・回数を確認できます。</p>`;
   if(exIdsWithData.length){
     html += `<div class="row" style="margin-bottom:8px"><div class="field"><select id="histExSel">${exIdsWithData.map(id=>`<option value="${id}">${(EXBY[id]&&EXBY[id].ja)||id}</option>`).join('')}</select></div></div>
-      <div id="histExChart"></div>`;
+      <div id="histExChart"></div>
+      <p class="hint hist-detail" id="histExDetail">グラフの点をタップすると、ここに詳細が出ます。</p>`;
   } else {
     html += `<p class="hint">重量を記録した種目がまだありません。</p>`;
   }
@@ -3511,50 +3540,128 @@ function renderHistory(){
     const vol = ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0);
     dayVol[ss.date] = (dayVol[ss.date]||0) + vol;
   });
-  html += `<h4 class="hist-h">継続の記録（直近10週）</h4><div class="hist-heat">${svgHeatmap(dayVol,10)}</div>`;
+  html += `<h4 class="hist-h">継続の記録（直近10週）</h4>
+    <p class="hint">1マス＝1日。色が濃いほど、その日にこなした総ボリューム（重量×レップの合計）が多いことを示します。トレーニングした日の並び方・間隔を見るためのものです。タップで日付と量を確認できます。</p>
+    <div class="hist-heat" id="histHeatChart">${svgHeatmap(dayVol,10)}</div>
+    <p class="hint hist-detail" id="histHeatDetail">マスをタップすると、ここに詳細が出ます。</p>`;
 
-  html += `<h4 class="hist-h">セッション履歴</h4>`;
+  html += `<h4 class="hist-h">セッション履歴</h4>
+    <p class="hint">行をタップすると削除ボタンが出ます（間違って記録したセッションを消せます）。</p>`;
   html += [...all].reverse().slice(0,30).map(ss=>{
     const vol = Math.round(ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0));
-    return `<div class="hist-sess"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>`;
+    const canDelete = !ss.inProgress && !historySampleMode;
+    return `<div class="hist-sess" data-id="${ss.id||''}">
+      <div class="hist-sess-main"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>
+      ${canDelete?`<button class="hist-sess-del" data-del-id="${ss.id}">この記録を削除</button>`:''}
+    </div>`;
   }).join('');
 
   $('#historyBody').innerHTML = html;
   wireHistoryToggle();
+  wireHistoryExport();
 
   function drawMuscleChart(){
     const m = $('#histMuscleSel').value;
-    const t = volumeTargetFor(m);
     const points = weekKeys.map((wk,i)=>{
       const cnt = sessions.filter(ss=>isoWeekKey(ss.date)===wk)
         .reduce((n,ss)=>n+ss.sets.filter(st=>st.m===m && st.effort==='max').length, 0);
-      return {x:i, y:cnt, label:`${wk}: ${cnt}セット`};
+      return {x:i, y:cnt, label:`${wk}の週：${cnt}セット（限界まで扱い）`};
     });
-    $('#histMuscleChart').innerHTML = svgLineChart([{label:MUSCLES[m].ja, color:MUSCLES[m].color, points}], {
-      refLines:[{y:t.mev,label:'MEV',color:'var(--muted)'},{y:t.mav,label:'MAV',color:'var(--ink)'},{y:t.mrv,label:'MRV',color:'var(--m-chest)'}]
-    });
+    $('#histMuscleChart').innerHTML = svgLineChart([{label:MUSCLES[m].ja, color:MUSCLES[m].color, points}]);
+    wireChartDetail('histMuscleChart','histMuscleDetail');
   }
   function drawExChart(){
     const sel = $('#histExSel'); if(!sel) return;
     const exId = sel.value;
     const points = [];
     [...sessions].sort((a,b)=>new Date(a.startedAt)-new Date(b.startedAt)).forEach((ss,i)=>{
-      const best = Math.max(0, ...ss.sets.filter(st=>st.exId===exId && st.weightKg).map(st=>e1rm(st.weightKg, st.actualReps)));
-      if(best>0) points.push({x:new Date(ss.startedAt).getTime(), y:Math.round(best*10)/10, label:`${ss.date}: 推定${Math.round(best)}kg`});
+      let bestSet = null, bestRm = 0;
+      ss.sets.filter(st=>st.exId===exId && st.weightKg).forEach(st=>{
+        const rm = e1rm(st.weightKg, st.actualReps);
+        if(rm>bestRm){ bestRm = rm; bestSet = st; }
+      });
+      if(bestSet) points.push({x:new Date(ss.startedAt).getTime(), y:Math.round(bestRm*10)/10,
+        label:`${ss.date}：${bestSet.weightKg}kg × ${bestSet.actualReps}回 → 推定1RM 約${Math.round(bestRm)}kg`});
     });
     $('#histExChart').innerHTML = svgLineChart([{label:EXBY[exId]?.ja||exId, color:'var(--ink)', points}]);
+    wireChartDetail('histExChart','histExDetail');
   }
   $('#histMuscleSel').addEventListener('change', drawMuscleChart);
   drawMuscleChart();
   if($('#histExSel')){ $('#histExSel').addEventListener('change', drawExChart); drawExChart(); }
+  wireChartDetail('histHeatChart','histHeatDetail');
 }
 function wireHistoryToggle(){
   const t = $('#histSampleToggle'); if(!t) return;
   t.addEventListener('change', ()=>{ historySampleMode = t.checked; renderHistory(); });
 }
+function wireHistoryExport(){
+  const b = $('#histExportBtn'); if(!b) return;
+  b.addEventListener('click', exportHistoryForAnalysis);
+}
+/* 通常の「設定を書き出す」は手法・設備選択などUI状態が中心で、AIに読ませるには
+   ノイズが多い。こちらは記録そのものだけを、単位・計算式の説明を添えて出す。
+   スキーマはこの1ファイルだけで自己説明できるようにしてある。 */
+function exportHistoryForAnalysis(){
+  const sessions = loadSessions();
+  const cur = loadCurrentSession();
+  const data = {
+    format: 'workout-history-export',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    description: 'ユーザーの筋力トレーニング記録。sessionsの1件が1回のトレーニング（session）で、その中のsetsが実際に行った1セットずつの記録。',
+    fieldNotes: {
+      weightKg: '使用重量(kg)。自重種目や記録なしはnull',
+      reps: '実施レップ数（回数ベースの種目のみ。時間ベースはnull）',
+      seconds: '実施秒数（プランク等の時間ベース種目のみ）',
+      effort: '限界まで=RIR0-1で追い込んだセット／通常=RIR2-3の一般的なセット／非限界=手法自体が追い込まないと定義しているセット',
+      volume: '重量(kg) × レップ数。ボリュームロード（トネージ）と呼ばれる一般的な指標',
+      estimated1RM: 'Epley式（重量 ×（1 ＋ レップ数 ÷ 30））による推定1レップ最大重量(kg)。実測ではなく推定値'
+    },
+    sessions: sessions.map(ss=>({
+      date: ss.date,
+      dayName: ss.dayName,
+      startedAt: ss.startedAt,
+      endedAt: ss.endedAt,
+      sets: ss.sets.map(st=>({
+        exercise: st.exJa,
+        muscle: MUSCLES[st.m] ? MUSCLES[st.m].ja : st.m,
+        blockType: st.blockType,
+        weightKg: st.weightKg ?? null,
+        reps: st.actualReps ?? null,
+        seconds: st.actualSec ?? null,
+        effort: st.effort==='max' ? '限界まで' : st.effort==='submax' ? '非限界' : '通常',
+        volume: (st.weightKg && st.actualReps) ? Math.round(st.weightKg*st.actualReps*10)/10 : null,
+        estimated1RM: (st.weightKg && st.actualReps) ? Math.round(e1rm(st.weightKg, st.actualReps)*10)/10 : null,
+        doneAt: st.doneAt
+      }))
+    })),
+    inProgressSession: cur ? {date:cur.date, dayName:cur.dayName, setsSoFar:cur.sets.length} : null
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date(); const pad=n=>String(n).padStart(2,'0');
+  a.href = url;
+  a.download = `workout-history-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  showToast('トレーニング履歴を書き出しました');
+}
 $('#historyBtn').addEventListener('click', ()=>{ renderHistory(); $('#historyModal').classList.add('on'); });
 $('#historyClose').addEventListener('click', ()=> $('#historyModal').classList.remove('on'));
 $('#historyModal').addEventListener('click', e=>{ if(e.target.id==='historyModal') $('#historyModal').classList.remove('on'); });
+$('#historyBody').addEventListener('click', ev=>{
+  const delBtn = ev.target.closest('.hist-sess-del');
+  if(delBtn){
+    if(!confirm('この記録を削除しますか？元に戻せません。')) return;
+    saveSessions(loadSessions().filter(s=>s.id!==delBtn.dataset.delId));
+    renderHistory();
+    return;
+  }
+  const row = ev.target.closest('.hist-sess');
+  if(row) row.classList.toggle('open');
+});
 
 /* ============================================================
    10. マニュアルモード（Phase 4）
@@ -3634,18 +3741,12 @@ function renderManual(){
 }
 
 function renderManualPanel(){
-  const targets = {}; MORDER.forEach(m=> targets[m] = volumeTargetFor(m));
   $('#manualPanel').innerHTML = `
     <div class="step">
       <div class="step-head"><span class="step-title">日を組み立てる</span></div>
       <p class="hint">日を追加し、各日の下部にある「＋種目を追加」から種目を選びます。複数選ぶとその場でスーパーセット・ラウンドになります。ブロックの✎で手法・回数・eff係数を編集できます。</p>
       <div id="manualDayList"></div>
       <button class="resetsw" id="manualAddDay" style="margin-top:8px">＋ 日を追加</button>
-    </div>
-    <div class="step">
-      <div class="step-head"><span class="step-title">MEV / MAV / MRV（週あたりハードセット数）</span></div>
-      <p class="hint">部位ごとの目安。履歴の可視化グラフの目標ラインにもこの値を使います。既定値は一般的な目安なので、自分の記録を見ながら調整してください。</p>
-      <div id="manualTargets"></div>
     </div>`;
 
   $('#manualDayList').innerHTML = manualPlan.days.length ? manualPlan.days.map((d,di)=>`
@@ -3657,14 +3758,6 @@ function renderManualPanel(){
         <button class="ord-b del" data-mday-act="del" data-di="${di}" title="この日を削除">✕</button>
       </span>
     </div>`).join('') : `<p class="hint">まだ日がありません。「＋ 日を追加」から始めてください。</p>`;
-
-  $('#manualTargets').innerHTML = MORDER.map(m=>`
-    <div class="manual-target-row">
-      <span>${MUSCLES[m].ja}</span>
-      <input type="number" min="0" data-m="${m}" data-k="mev" value="${targets[m].mev}"><label>MEV</label>
-      <input type="number" min="0" data-m="${m}" data-k="mav" value="${targets[m].mav}"><label>MAV</label>
-      <input type="number" min="0" data-m="${m}" data-k="mrv" value="${targets[m].mrv}"><label>MRV</label>
-    </div>`).join('');
 }
 
 $('#manualPanel').addEventListener('click', ev=>{
@@ -3681,20 +3774,22 @@ $('#manualPanel').addEventListener('click', ev=>{
 $('#manualPanel').addEventListener('change', ev=>{
   const nameInput = ev.target.closest('.manual-day-name');
   if(nameInput){ manualPlan.days[+nameInput.dataset.di].name = nameInput.value.trim() || '名称未設定'; saveManualPlan(); render(); return; }
-  const t = ev.target.closest('[data-k]');
-  if(t && t.dataset.m){
-    let vt = {}; try{ vt = JSON.parse(localStorage.getItem('workoutVolumeTargets'))||{}; }catch(e){}
-    if(!vt[t.dataset.m]) vt[t.dataset.m] = {...DEFAULT_VOLUME_TARGETS[t.dataset.m]};
-    vt[t.dataset.m][t.dataset.k] = +t.value || 0;
-    try{ localStorage.setItem('workoutVolumeTargets', JSON.stringify(vt)); }catch(e){}
-  }
 });
 
-/* ---- 種目ピッカー（種目を選んでブロックとして追加） ---- */
-let exPickDi = null, exPickSelected = new Set();
+/* ---- 種目ピッカー（種目を選んでブロックとして追加、または既存ブロックに追加） ---- */
+let exPickDi = null, exPickSelected = new Set(), exPickAppendBi = null;
 function allPickableExercises(){ return [...EX, ...manualCustomEx]; }
 function openExPicker(di){
-  exPickDi = di; exPickSelected = new Set();
+  exPickDi = di; exPickAppendBi = null; exPickSelected = new Set();
+  $('#exPickSub').textContent = '複数選ぶと、その場でスーパーセット／ラウンドとしてまとめて追加します。';
+  $('#exPickMuscle').innerHTML = '<option value="">すべての部位</option>' + MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('');
+  $('#exPickSearch').value = '';
+  renderExPickList();
+  $('#exPickModal').classList.add('on');
+}
+function openExPickerAppend(di, biStr){
+  exPickDi = di; exPickAppendBi = biStr; exPickSelected = new Set();
+  $('#exPickSub').textContent = '選んだ種目を、このブロックに追加します（ペア／ラウンドになります）。';
   $('#exPickMuscle').innerHTML = '<option value="">すべての部位</option>' + MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('');
   $('#exPickSearch').value = '';
   renderExPickList();
@@ -3724,6 +3819,20 @@ $('#exPickAdd').addEventListener('click', ()=>{
   if(exPickDi==null || !exPickSelected.size) return;
   const ids = [...exPickSelected];
   const day = manualPlan.days[exPickDi]; if(!day) return;
+
+  if(exPickAppendBi!=null){
+    // 既存ブロックに種目を追加するモード
+    const mb = day.blocks[+exPickAppendBi]; if(!mb) return;
+    ids.forEach(id=>{ if(!mb.exIds.includes(id)) mb.exIds.push(id); });
+    if(mb.exIds.length>=3 && mb.type!=='round'){ mb.type='round'; mb.rounds=mb.rounds||3; mb.restIn=mb.restIn??10; }
+    else if(mb.exIds.length===2 && mb.type==='straight'){ mb.type='pair'; mb.restIn=mb.restIn??0; }
+    saveManualPlan();
+    $('#exPickModal').classList.remove('on');
+    render();
+    openBlockEditor(exPickDi, exPickAppendBi);
+    return;
+  }
+
   const type = ids.length===1 ? 'straight' : ids.length===2 ? 'pair' : 'round';
   day.blocks.push({
     type, exIds:ids, sets:3, reps: ids.length>1?'10–12':'8–12', rest:90,
@@ -3777,6 +3886,12 @@ function renderBlockExtraFields(mb){
   row.classList.remove('hide');
   row.innerHTML = fields.map(f=>`<div class="field"><label>${f.label}</label><input type="number" id="beX_${f.key}" min="${f.min}" max="${f.max}" value="${mb[f.key] ?? f.default}"></div>`).join('');
 }
+function renderBeExList(mb){
+  $('#beExList').innerHTML = mb.exIds.map((id,i)=>{
+    const ex = EXBY[id];
+    return `<span class="be-ex-chip"><span>${ex?ex.ja:id}</span><button type="button" data-rm-ex="${i}" title="この種目を外す" ${mb.exIds.length<=1?'disabled':''}>&times;</button></span>`;
+  }).join('');
+}
 function openBlockEditor(di, biStr){
   const dayObj = manualPlan.days[di]; if(!dayObj) return;
   const bi = +biStr;
@@ -3784,6 +3899,7 @@ function openBlockEditor(di, biStr){
   blockEditTarget = {di, bi};
   $('#beTitle').textContent = mb.exIds.map(id=>(EXBY[id]&&EXBY[id].ja)||id).join(' + ');
   $('#beSub').textContent = dayObj.name;
+  renderBeExList(mb);
   $('#beType').value = mb.type;
   $('#beTypeDesc').textContent = BLOCK[mb.type].desc;
   $('#beSetsField').classList.toggle('hide', mb.type!=='straight');
@@ -3795,6 +3911,25 @@ function openBlockEditor(di, biStr){
   renderBlockExtraFields(mb);
   $('#blockEditModal').classList.add('on');
 }
+$('#beExList').addEventListener('click', ev=>{
+  const b = ev.target.closest('button[data-rm-ex]'); if(!b || b.disabled || !blockEditTarget) return;
+  const {di,bi} = blockEditTarget;
+  const mb = manualPlan.days[di] && manualPlan.days[di].blocks[bi]; if(!mb) return;
+  mb.exIds.splice(+b.dataset.rmEx, 1);
+  if(mb.exIds.length<=2 && mb.type==='round'){ mb.type = mb.exIds.length===2?'pair':'straight'; }
+  else if(mb.exIds.length===1 && mb.type==='pair'){ mb.type='straight'; }
+  saveManualPlan();
+  $('#beTitle').textContent = mb.exIds.map(id=>(EXBY[id]&&EXBY[id].ja)||id).join(' + ');
+  $('#beType').value = mb.type;
+  $('#beTypeDesc').textContent = BLOCK[mb.type].desc;
+  $('#beSetsField').classList.toggle('hide', mb.type!=='straight');
+  renderBlockExtraFields(mb);
+  renderBeExList(mb);
+});
+$('#beAddEx').addEventListener('click', ()=>{
+  if(!blockEditTarget) return;
+  openExPickerAppend(blockEditTarget.di, String(blockEditTarget.bi));
+});
 $('#beType').addEventListener('change', ()=>{
   const t = $('#beType').value;
   $('#beTypeDesc').textContent = BLOCK[t].desc;
