@@ -4053,6 +4053,14 @@ function drawManualScorePanel(wk){
 function renderManual(){
   const pseudoMethod = {id:'manual', ja:'マニュアル', by:'—', workSec:40, rest:null, pro:0, goal:null, presetWeeks:null};
   currentMethod = pseudoMethod;
+  /* buildManualWeek/drawManualScorePanelは週インデックスを0固定で参照する。
+     drawMenuや重量入力・並び替えの保存など既存の共通コードは
+     +$('#week').value を動的に読むため、#weekが0以外の値のまま残っていると
+     （presetWeeks手法から切り替えた直後などに起こりうる）、同じ種目なのに
+     参照する重量キーがズレて、上部のスコア収支と種目ごとのスコア表示が
+     食い違う——これが実際に報告された不一致の原因。マニュアルモードには
+     週の概念が無いので、ここで確実に0に揃える。 */
+  if($('#week').value !== '0') $('#week').value = '0';
   const wk = buildManualWeek();
   currentWk = wk;
   renderManualPanel();
