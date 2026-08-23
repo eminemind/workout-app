@@ -684,16 +684,16 @@ input[type=number],input[type=text]{padding:8px 9px}
       <div id="manualPanel" class="hide"></div>
 
       <div class="step">
-        <div class="step-head"><span class="step-no">05</span><span class="step-title">身体データ（目標スコア用）</span></div>
-        <p class="hint">性別・体重・身長からBMIを出し、それを基準に部位ごとの目安の目標スコアを計算します。トレーニング負荷スコアを使う手法（標準・プロプリセット）で表示されます。</p>
-        <div class="row">
+        <div class="step-head"><span class="step-no">05</span><span class="step-title">身体データ</span></div>
+        <p class="hint" id="bodyDataHint">性別・体重・身長からBMIを出し、それを基準に部位ごとの目安の目標スコアを計算します。トレーニング負荷スコアを使う手法（標準・プロプリセット）で表示されます。</p>
+        <div class="row hide" id="bSexRow">
           <div class="field"><label>性別</label>
             <select id="bSex"><option value="m">男性</option><option value="f">女性</option><option value="o">回答しない</option></select>
           </div>
         </div>
         <div class="row" style="margin-top:10px">
           <div class="field"><label>体重 kg</label><input type="number" id="bWeight" min="30" max="200" step="0.5" placeholder="例：65"></div>
-          <div class="field"><label>身長 cm</label><input type="number" id="bHeight" min="120" max="220" step="0.5" placeholder="例：170"></div>
+          <div class="field hide" id="bHeightField"><label>身長 cm</label><input type="number" id="bHeight" min="120" max="220" step="0.5" placeholder="例：170"></div>
         </div>
         <p class="hint" id="bmiHint" style="margin-top:8px"></p>
       </div>
@@ -4285,6 +4285,11 @@ function syncModeUI(){
   $('#autoSteps').classList.toggle('hide', appMode==='manual');
   $('#manualPanel').classList.toggle('hide', appMode!=='manual');
   $('#rerollBlock').classList.toggle('hide', appMode==='manual');
+  $('#bSexRow').classList.toggle('hide', appMode==='manual');
+  $('#bHeightField').classList.toggle('hide', appMode==='manual');
+  $('#bodyDataHint').textContent = appMode==='manual'
+    ? '体重は自重種目（懸垂・ディップスなど）のスコア計算に使います。'
+    : '性別・体重・身長からBMIを出し、それを基準に部位ごとの目安の目標スコアを計算します。トレーニング負荷スコアを使う手法（標準・プロプリセット）で表示されます。';
 }
 $('#modeToggle').addEventListener('click', ev=>{
   const b = ev.target.closest('button[data-mode]'); if(!b) return;
