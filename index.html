@@ -254,7 +254,7 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
 .ex-sets{font-family:var(--display);font-variation-settings:'wdth' 122,'wght' 800;font-size:14px;white-space:nowrap}
 .ex-sets small{display:block;font-variation-settings:'wdth' 112,'wght' 500;font-size:10.5px;color:var(--muted);text-align:right}
 .wt-wrap{display:flex;align-items:center;justify-content:flex-end;gap:4px;margin:3px 0 1px}
-.wt-input{width:44px;text-align:right;
+.wt-input{width:60px;text-align:right;
   font-family:var(--display);font-variation-settings:'wdth' 112,'wght' 700;font-size:12px;
   border:1px solid var(--rule);background:var(--surface);padding:2px 5px;color:var(--ink)}
 .wt-input::placeholder{color:var(--muted);font-weight:500}
@@ -409,6 +409,16 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
    カード単位の大きい面だけに絞っている。 */
 html{background:var(--ground);background-attachment:fixed}
 body{background:transparent}
+:root{color-scheme:light dark}
+/* 素の<input>（体重・身長・セット数・レップ・インターバル等）はここまで
+   どのクラスにも該当せずブラウザ既定のまま=ダークモードでブラウザが自動で
+   文字色だけ白に振り替え、白背景に白文字で読めなくなっていた。
+   明示的に背景・文字色を指定して既定を上書きする。 */
+input,select,textarea{
+  background:var(--surface-2); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--radius-sm);
+}
+input[type=number],input[type=text]{padding:8px 9px}
 
 .panel,.day,.sheet,.mcard,.pcard,.rotnote,.conv,.empty,.swaplist,.rail,.toast{
   backdrop-filter:blur(var(--blur)) saturate(170%);
@@ -431,6 +441,14 @@ body{background:transparent}
 .mcard,.pcard,.rotnote{border-radius:var(--radius-md);border-left-width:3px}
 .conv{border-radius:var(--radius-md);overflow:hidden}
 .conv h3{border-bottom:1px solid var(--rule)}
+.conv-details>summary{padding:10px 14px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--ink);
+  list-style:none;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:6px}
+.conv-details[open]>summary{border-bottom:1px solid var(--rule)}
+.conv-details>summary::-webkit-details-marker{display:none}
+.conv-details>summary::before{content:'\203A';color:var(--muted);transition:transform .2s;flex:none}
+.conv-details[open]>summary::before{transform:rotate(90deg)}
+.conv-details>summary::after{content:'（タップで表示）';font-weight:500;color:var(--muted);font-size:10.5px}
+.conv-details[open]>summary::after{content:''}
 .conv td{border-bottom:1px solid var(--surface-2)}
 .empty{border-radius:var(--radius-md);border-style:solid}
 .swaplist{border-radius:var(--radius-md);overflow:hidden}
@@ -614,6 +632,16 @@ body{background:transparent}
     </div>
     <div class="row" style="margin-top:10px">
       <div class="field"><label>インターバル 秒</label><input type="number" id="eRest" min="0" max="600" step="5"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field">
+        <label>努力係数</label>
+        <select id="eEffort">
+          <option value="max">限界まで（RIR0-1・ハードセット）</option>
+          <option value="normal" selected>通常（RIR2-3）</option>
+          <option value="submax">非限界（手法自体が追い込まないと定義）</option>
+        </select>
+      </div>
     </div>
     <button class="fixbtn" id="eSave" style="margin-top:14px">保存する</button>
     <button class="resetsw" id="eReset" style="margin-top:8px">この種目をプリセットの数値に戻す</button>
@@ -1570,6 +1598,10 @@ function applyEditOverride(b, so, workSec){
       b.detail = `限界後、重量を落として${b.stages}段階 ・ 段階間は休まない`;
     }
   }
+  if(so.effort){
+    b.toFailure = so.effort==='max';
+    b.submax = so.effort==='submax';
+  }
   b.eff = b.phys * BLOCK[b.type].eff * (b.toFailure?FAILURE_BONUS:1) * (b.submax?SUBMAX_DISCOUNT:1);
   b.edited = true;
   return b;
@@ -1895,7 +1927,8 @@ function render(){
 
 function drawConv(method, preset){
   if(method.pro || method.id==='std'){
-    $('#conv').innerHTML = `<h3>トレーニング負荷スコアの計算式（このツール独自の目安）</h3>
+    $('#conv').innerHTML = `<details class="spec-details conv-details">
+      <summary>トレーニング負荷スコアの計算式（このツール独自の目安）</summary>
       <table class="wide">
         <tr><td>ボリュームロード</td><td>実セット数 × 平均レップ数 × 重量(kg)</td><td>トネージとも呼ばれる、実在するトレーニング指標</td></tr>
         <tr><td>未入力時の代用</td><td>実セット数 × 平均レップ数 × 1</td><td>重量が未入力の種目は、回数だけの目安に落とす</td></tr>
@@ -1911,7 +1944,8 @@ function drawConv(method, preset){
         <tr class="on"><td>性別係数</td><td>男性 &times;1.00 ／ 女性 &times;0.75 ／ 回答しない &times;0.875</td><td>平均的な除脂肪量・筋力差をならした概算。個人差は非常に大きい</td></tr>
         <tr class="on"><td>部位配分</td><td>背中20% 脚24% 胸14% 臀部14% 肩10% 腕10% 体幹8%</td><td>大まかな筋量比に基づく概算で、出典のある数値ではない</td></tr>
       </table>
-      <p class="convnote">目標スコア ＝ 体重 × 体格係数 × 性別係数 × 240（このツール独自の倍率） × 部位配分。<b>BMIと基準値22までは実在の参照値ですが、そこから先の目標スコアはこのツール独自の推定です。</b>BMIのような疫学的な裏付けがあるわけではなく、あくまで一つの目安として使ってください。</p>`;
+      <p class="convnote">目標スコア ＝ 体重 × 体格係数 × 性別係数 × 240（このツール独自の倍率） × 部位配分。<b>BMIと基準値22までは実在の参照値ですが、そこから先の目標スコアはこのツール独自の推定です。</b>BMIのような疫学的な裏付けがあるわけではなく、あくまで一つの目安として使ってください。</p>
+    </details>`;
     return;
   }
   const used=new Set();
@@ -2058,11 +2092,12 @@ function drawMenu({method, wk, mins}){
     const est=Math.round(p.sec/60)+10, over=est>mins;
     const eff=rnd(p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.eff),0),0));
     const phys=p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+(b.blocked?0:b.phys),0),0);
+    const dayScore=rnd(p.groups.reduce((s,g)=>s+g.blocks.reduce((t,b)=>t+b.exs.reduce((u,ex,i)=>u+exerciseScore(b, i, weightOv[weightKey(method.id,wkIdx,p.di,g.bi,i)], bwKg),0),0),0));
     const nBlk = p.groups.length;
     return `<article class="day">
       <div class="day-head"><span class="day-no">${wk.isPreset?String.fromCharCode(65+p.di):String(p.di+1).padStart(2,'0')}</span>
         <span class="day-name">${p.day.ja}</span>
-        <span class="day-meta ${over?'over':''}">実セット ${phys} ・ 有効 ${eff} ・ 約${est}分${over?' ⚠時間超過':''}</span></div>
+        <span class="day-meta ${over?'over':''}">実セット ${phys} ・ 有効 ${eff} ・ スコア ${dayScore} ・ 約${est}分${over?' ⚠時間超過':''}</span></div>
       <div class="blk-list" data-di="${p.di}">
       ${p.groups.map((g,gi)=>g.blocks.map(b=>`
         <div class="blk${b.blocked?' blocked':''}" data-bi="${g.bi}">
@@ -2090,7 +2125,8 @@ function drawMenu({method, wk, mins}){
                     value="${weightOv[weightKey(method.id,wkIdx,p.di,g.bi,i)] ?? ''}">
                   <span class="wt-unit">${ex.loadUnit==='pair'?'kg/片手':ex.loadUnit==='bw'?(bwKg?`加重kg<br>(体重${Math.round(bwKg*(BW_FRACTION[ex.id]??1))}kg込み)`:'加重kg'):'kg'}</span>
                 </div>
-                <small>${restLabel(b,i)}</small></div>
+                <small>${restLabel(b,i)}</small>
+                <small class="ex-score">score ${rnd(exerciseScore(b, i, weightOv[weightKey(method.id,wkIdx,p.di,g.bi,i)], bwKg))}</small></div>
               <div class="ex-acts">
                 ${b.exs.length>1?`
                   <button class="ord-b sm" data-act="ex" data-di="${p.di}" data-bi="${g.bi}" data-orig="${(b.origIds&&b.origIds[i])||ex.id}" data-dir="up" ${i===0?'disabled':''} title="この種目を1つ前に">▲</button>
@@ -2244,6 +2280,7 @@ $('#menu').addEventListener('click',ev=>{
   $('#eSets').value = blk.sets || '';
   $('#eReps').value = blk.reps || '';
   $('#eRest').value = blk.rest ?? '';
+  $('#eEffort').value = blk.toFailure ? 'max' : blk.submax ? 'submax' : 'normal';
   $('#editModal').classList.add('on');
 });
 $('#eSave').addEventListener('click',()=>{
@@ -2252,7 +2289,8 @@ $('#eSave').addEventListener('click',()=>{
   const setsVal = $('#eSets').value ? +$('#eSets').value : null;
   const repsVal = $('#eReps').value || null;
   const restVal = $('#eRest').value ? +$('#eRest').value : null;
-  setsRepsOv[key] = {sets:setsVal, reps:repsVal, rest:restVal};
+  const effortVal = $('#eEffort').value || 'normal';
+  setsRepsOv[key] = {sets:setsVal, reps:repsVal, rest:restVal, effort:effortVal};
   $('#editModal').classList.remove('on'); editTarget=null; render();
 });
 $('#eReset').addEventListener('click',()=>{
