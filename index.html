@@ -529,12 +529,20 @@ input[type=number],input[type=text]{padding:8px 9px}
 .hist-mtrack{height:16px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);position:relative;overflow:hidden}
 .hist-mfill{height:100%;border-radius:var(--radius-pill)}
 .hist-mmark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--rule-strong)}
-.hist-sess{border-bottom:1px solid var(--rule);padding:10px 0;font-size:12.5px}
-.hist-sess:last-child{border-bottom:0}
-.hist-sess{cursor:pointer}
-.hist-sess-main{pointer-events:none}
-.hist-sess-del{display:none;margin-top:8px;background:var(--m-chest);color:var(--on-dark);border:0;border-radius:var(--radius-sm);padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer}
-.hist-sess.open .hist-sess-del{display:inline-block}
+.hist-date-group{border-bottom:1px solid var(--rule)}
+.hist-date-group:last-child{border-bottom:0}
+.hist-date-head{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;
+  background:transparent;border:0;padding:10px 0;font-size:12.5px;cursor:pointer;text-align:left;color:var(--ink)}
+.hist-date-head small{display:block;color:var(--muted);font-size:11px;font-weight:400;margin-top:1px}
+.hist-date-head:hover{opacity:.75}
+.hist-thread{padding:2px 0 14px 12px;border-left:2px solid var(--rule)}
+.hist-thread-sess{margin-bottom:12px}
+.hist-thread-sess:last-child{margin-bottom:0}
+.hist-thread-sess-head{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.hist-thread-ex{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0}
+.hist-thread-ex b{font-weight:700}
+.hist-thread-ex span{color:var(--muted);text-align:right}
+.hist-sess-del{margin-top:8px;background:var(--m-chest);color:var(--on-dark);border:0;border-radius:var(--radius-sm);padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer}
 .hist-detail{min-height:1.6em;border-top:1px dashed var(--rule);padding-top:6px;margin-top:2px}
 .chart-hit{cursor:pointer}
 .hist-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
@@ -3458,27 +3466,40 @@ function wireChartDetail(containerId, detailId){
   });
 }
 
-function svgHeatmap(dayVolumes, weeksBack){
+/* dayTrained: {'YYYY-MM-DD': true/false 相当（存在すればトレーニングした日）}。
+   種目・重量の濃淡ではなく「その日やったかどうか」だけを見せる二値表示にしている
+   ——量で色を変えると「種目によって色が違う」ように誤読されやすかったため。 */
+function svgHeatmap(dayTrained, weeksBack){
   weeksBack = weeksBack||10;
   const cell=13, gap=3;
+  const labelColW=20, labelRowH=14;
+  const wdJa=['日','月','火','水','木','金','土'];
   const today = new Date(); today.setHours(0,0,0,0);
   const start = new Date(today.getTime() - (weeksBack*7-1)*86400000);
   start.setDate(start.getDate() - start.getDay());
-  const maxV = Math.max(1, ...Object.values(dayVolumes));
-  let cells = '';
+  let cells = '', monthLabels = '', lastMonth = null;
   for(let w=0; w<=weeksBack; w++){
+    const colDate = new Date(start.getTime() + w*7*86400000);
+    const monthKey = colDate.getFullYear()+'-'+colDate.getMonth();
+    if(monthKey !== lastMonth){
+      lastMonth = monthKey;
+      const weekOfMonth = Math.ceil((colDate.getDate())/7);
+      monthLabels += `<text x="${labelColW + w*(cell+gap)}" y="${labelRowH-4}" font-size="9" fill="var(--muted)">${colDate.getMonth()+1}月第${weekOfMonth}週</text>`;
+    }
     for(let d=0; d<7; d++){
       const date = new Date(start.getTime() + (w*7+d)*86400000);
       if(date>today) continue;
       const key = date.toISOString().slice(0,10);
-      const v = dayVolumes[key]||0;
-      const alpha = v ? Math.min(1, 0.18+0.82*(v/maxV)) : 0.07;
-      const x = w*(cell+gap), y = d*(cell+gap);
-      const label = `${key}${v?` ・ 総ボリューム約${Math.round(v).toLocaleString()}kg`:' ・ 記録なし'}`;
+      const trained = !!dayTrained[key];
+      const alpha = trained ? 0.85 : 0.07;
+      const x = labelColW + w*(cell+gap), y = labelRowH + d*(cell+gap);
+      const label = `${key}（${wdJa[d]}）${trained?' ・ トレーニングした日':' ・ 記録なし'}`;
       cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="var(--ink)" opacity="${alpha.toFixed(2)}" class="chart-hit" data-label="${label}"/>`;
     }
   }
-  const W=(weeksBack+1)*(cell+gap), H=7*(cell+gap);
+  const wdLabels = wdJa.map((wd,d)=>`<text x="0" y="${labelRowH + d*(cell+gap) + cell - 2}" font-size="9" fill="var(--muted)">${wd}</text>`).join('');
+  cells = wdLabels + monthLabels + cells;
+  const W=labelColW+(weeksBack+1)*(cell+gap), H=labelRowH+7*(cell+gap);
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${cells}</svg>`;
 }
 
@@ -3535,24 +3556,51 @@ function renderHistory(){
   }
 
   // カレンダーヒートマップ
-  const dayVol = {};
-  all.forEach(ss=>{
-    const vol = ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0);
-    dayVol[ss.date] = (dayVol[ss.date]||0) + vol;
-  });
+  const dayTrained = {};
+  all.forEach(ss=>{ dayTrained[ss.date] = true; });
   html += `<h4 class="hist-h">継続の記録（直近10週）</h4>
-    <p class="hint">1マス＝1日。色が濃いほど、その日にこなした総ボリューム（重量×レップの合計）が多いことを示します。トレーニングした日の並び方・間隔を見るためのものです。タップで日付と量を確認できます。</p>
-    <div class="hist-heat" id="histHeatChart">${svgHeatmap(dayVol,10)}</div>
+    <p class="hint">1マス＝1日。濃い色＝その日トレーニングした（種目や量は問わない）。横は曜日、縦の見出しは月と第何週かを示します。タップで日付を確認できます。</p>
+    <div class="hist-heat" id="histHeatChart">${svgHeatmap(dayTrained,10)}</div>
     <p class="hint hist-detail" id="histHeatDetail">マスをタップすると、ここに詳細が出ます。</p>`;
 
   html += `<h4 class="hist-h">セッション履歴</h4>
-    <p class="hint">行をタップすると削除ボタンが出ます（間違って記録したセッションを消せます）。</p>`;
-  html += [...all].reverse().slice(0,30).map(ss=>{
-    const vol = Math.round(ss.sets.reduce((t,st)=>t+((st.weightKg||0)*(st.actualReps||0)),0));
-    const canDelete = !ss.inProgress && !historySampleMode;
-    return `<div class="hist-sess" data-id="${ss.id||''}">
-      <div class="hist-sess-main"><b>${ss.date} ・ ${ss.dayName}${ss.inProgress?'（進行中）':''}</b><span>${ss.sets.length}セット ・ 総ボリューム約${vol.toLocaleString()}kg</span></div>
-      ${canDelete?`<button class="hist-sess-del" data-del-id="${ss.id}">この記録を削除</button>`:''}
+    <p class="hint">日付をタップすると、その日に実施した種目の一覧が開きます。個別の記録はそこから削除できます。</p>`;
+  const byDate = {};
+  all.forEach(ss=>{ (byDate[ss.date] = byDate[ss.date]||[]).push(ss); });
+  const dateKeys = Object.keys(byDate).sort().reverse().slice(0,30);
+  html += dateKeys.map(date=>{
+    const list = byDate[date];
+    const totalSets = list.reduce((n,ss)=>n+ss.sets.length,0);
+    const totalVol = Math.round(list.reduce((t,ss)=>t+ss.sets.reduce((u,st)=>u+((st.weightKg||0)*(st.actualReps||0)),0),0));
+    const names = [...new Set(list.map(ss=>ss.dayName))].join('・');
+    const thread = list.map(ss=>{
+      // 種目ごとにまとめる（同じ種目の複数セットを1行に）。実施した順を保つ
+      const byEx = []; const seen = new Map();
+      ss.sets.forEach(st=>{
+        if(!seen.has(st.exId)){ const g={exJa:st.exJa, entries:[]}; seen.set(st.exId,g); byEx.push(g); }
+        seen.get(st.exId).entries.push(st);
+      });
+      const exLines = byEx.map(g=>{
+        const parts = g.entries.map(st=>{
+          if(st.weightKg!=null) return `${st.weightKg}kg×${st.actualReps}回`;
+          if(st.actualSec!=null) return `${st.actualSec}秒`;
+          return `${st.actualReps||'-'}回`;
+        }).join('、');
+        return `<div class="hist-thread-ex"><b>${g.exJa}</b><span>${parts}</span></div>`;
+      }).join('');
+      const canDelete = !ss.inProgress && !historySampleMode;
+      return `<div class="hist-thread-sess">
+        <div class="hist-thread-sess-head">${ss.dayName}${ss.inProgress?'（進行中）':''}</div>
+        ${exLines || '<p class="hint">記録されたセットがありません。</p>'}
+        ${canDelete?`<button type="button" class="hist-sess-del" data-del-id="${ss.id}">この記録を削除</button>`:''}
+      </div>`;
+    }).join('');
+    return `<div class="hist-date-group">
+      <button type="button" class="hist-date-head" data-date="${date}">
+        <span><b>${date}</b><small>${names}</small></span>
+        <span>${totalSets}セット ・ 約${totalVol.toLocaleString()}kg</span>
+      </button>
+      <div class="hist-thread hide">${thread}</div>
     </div>`;
   }).join('');
 
@@ -3659,8 +3707,11 @@ $('#historyBody').addEventListener('click', ev=>{
     renderHistory();
     return;
   }
-  const row = ev.target.closest('.hist-sess');
-  if(row) row.classList.toggle('open');
+  const dateHead = ev.target.closest('.hist-date-head');
+  if(dateHead){
+    dateHead.nextElementSibling.classList.toggle('hide');
+    return;
+  }
 });
 
 /* ============================================================
