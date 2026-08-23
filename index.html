@@ -542,7 +542,16 @@ input[type=number],input[type=text]{padding:8px 9px}
 .hist-thread-ex{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0}
 .hist-thread-ex b{font-weight:700}
 .hist-thread-ex span{color:var(--muted);text-align:right}
-.hist-sess-del{margin-top:8px;background:var(--m-chest);color:var(--on-dark);border:0;border-radius:var(--radius-sm);padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer}
+.hist-sess-edit{margin-top:8px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer;color:var(--ink)}
+.hist-sess-edit:hover{background:var(--ink);color:var(--on-dark)}
+.se-row{background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:8px;margin-bottom:8px}
+.se-row-ex{font-size:12.5px;font-weight:700;margin-bottom:6px}
+.se-row-fields{display:flex;align-items:center;gap:6px}
+.se-row input,.se-row select{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:6px 4px;font-size:11.5px;text-align:center;min-width:0}
+.se-row .se-w,.se-row .se-r,.se-row .se-sec{flex:1}
+.se-row .se-eff{flex:1.6}
+.se-row-del{background:var(--surface);border:1px solid var(--rule);border-radius:50%;width:26px;height:26px;line-height:1;cursor:pointer;color:var(--ink);flex:none}
+#seDeleteAll{color:var(--m-chest);border-color:var(--m-chest)}
 .hist-detail{min-height:1.6em;border-top:1px dashed var(--rule);padding-top:6px;margin-top:2px}
 .chart-hit{cursor:pointer}
 .hist-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
@@ -824,6 +833,16 @@ input[type=number],input[type=text]{padding:8px 9px}
     <p class="hint" style="margin-top:6px"><b>普段は空欄のままでOKです。</b>アプリは手法ごとに「これくらいキツい」という数値（有効セット換算）を仮に置いています（例：ドロップセット×1.9、レストポーズ×2.6）。これはあくまで推定値なので、「自分の体感だとこの手法はもっとキツい／楽」と感じたら、ここに直接その数値を入れて上書きできます。数値が大きいほど「効いた扱い」が大きくなり、週間の集計に強く反映されます。</p>
     <button class="fixbtn" id="beSave" style="margin-top:14px">保存する</button>
     <button class="resetsw" id="beDelete" style="margin-top:8px">このブロックを削除</button>
+  </div>
+</div></div>
+
+<div class="modal" id="sessionEditModal"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-head"><div><h3 id="seTitle">記録を編集</h3><div class="sub" id="seSub">—</div></div>
+    <button class="x" id="seClose" aria-label="閉じる">&times;</button></div>
+  <div class="sheet-body">
+    <div id="seSetList"></div>
+    <button class="fixbtn" id="seSave" style="margin-top:14px">保存する</button>
+    <button class="resetsw" id="seDeleteAll" style="margin-top:8px">このセッションを削除</button>
   </div>
 </div></div>
 
@@ -3536,14 +3555,6 @@ function renderHistory(){
     <div><b>${Math.round(totalVolume).toLocaleString()}</b><span>総ボリューム(kg)</span></div>
   </div>`;
 
-  // 週次ハードセット数（部位別・選択式）
-  const weekKeys = [...new Set(sessions.map(ss=>isoWeekKey(ss.date)))].sort();
-  html += `<h4 class="hist-h">週次ハードセット数（部位別・「限界まで」設定のみ）</h4>
-    <p class="hint">その週に「限界まで」で行ったセット数（種目数ではなくセット数）。タップすると詳しい数字が出ます。</p>
-    <div class="row" style="margin-bottom:8px"><div class="field"><select id="histMuscleSel">${MORDER.map(m=>`<option value="${m}">${MUSCLES[m].ja}</option>`).join('')}</select></div></div>
-    <div id="histMuscleChart"></div>
-    <p class="hint hist-detail" id="histMuscleDetail">グラフの点をタップすると、ここに詳細が出ます。</p>`;
-
   // e1RM推移（種目選択式）
   const exIdsWithData = [...new Set(sessions.flatMap(ss=>ss.sets.filter(st=>st.weightKg).map(st=>st.exId)))];
   html += `<h4 class="hist-h">推定1RMの推移</h4>
@@ -3589,11 +3600,11 @@ function renderHistory(){
         }).join('、');
         return `<div class="hist-thread-ex"><b>${g.exJa}</b><span>${parts}</span></div>`;
       }).join('');
-      const canDelete = !ss.inProgress && !historySampleMode;
+      const canEdit = !ss.inProgress && !historySampleMode;
       return `<div class="hist-thread-sess">
         <div class="hist-thread-sess-head">${ss.dayName}${ss.inProgress?'（進行中）':''}</div>
         ${exLines || '<p class="hint">記録されたセットがありません。</p>'}
-        ${canDelete?`<button type="button" class="hist-sess-del" data-del-id="${ss.id}">この記録を削除</button>`:''}
+        ${canEdit?`<button type="button" class="hist-sess-edit" data-edit-id="${ss.id}">編集・削除</button>`:''}
       </div>`;
     }).join('');
     return `<div class="hist-date-group">
@@ -3609,16 +3620,6 @@ function renderHistory(){
   wireHistoryToggle();
   wireHistoryExport();
 
-  function drawMuscleChart(){
-    const m = $('#histMuscleSel').value;
-    const points = weekKeys.map((wk,i)=>{
-      const cnt = sessions.filter(ss=>isoWeekKey(ss.date)===wk)
-        .reduce((n,ss)=>n+ss.sets.filter(st=>st.m===m && st.effort==='max').length, 0);
-      return {x:i, y:cnt, label:`${wk}の週：${cnt}セット（限界まで扱い）`};
-    });
-    $('#histMuscleChart').innerHTML = svgLineChart([{label:MUSCLES[m].ja, color:MUSCLES[m].color, points}]);
-    wireChartDetail('histMuscleChart','histMuscleDetail');
-  }
   function drawExChart(){
     const sel = $('#histExSel'); if(!sel) return;
     const exId = sel.value;
@@ -3635,8 +3636,6 @@ function renderHistory(){
     $('#histExChart').innerHTML = svgLineChart([{label:EXBY[exId]?.ja||exId, color:'var(--ink)', points}]);
     wireChartDetail('histExChart','histExDetail');
   }
-  $('#histMuscleSel').addEventListener('change', drawMuscleChart);
-  drawMuscleChart();
   if($('#histExSel')){ $('#histExSel').addEventListener('change', drawExChart); drawExChart(); }
   wireChartDetail('histHeatChart','histHeatDetail');
 }
@@ -3701,19 +3700,87 @@ $('#historyBtn').addEventListener('click', ()=>{ renderHistory(); $('#historyMod
 $('#historyClose').addEventListener('click', ()=> $('#historyModal').classList.remove('on'));
 $('#historyModal').addEventListener('click', e=>{ if(e.target.id==='historyModal') $('#historyModal').classList.remove('on'); });
 $('#historyBody').addEventListener('click', ev=>{
-  const delBtn = ev.target.closest('.hist-sess-del');
-  if(delBtn){
-    if(!confirm('この記録を削除しますか？元に戻せません。')) return;
-    saveSessions(loadSessions().filter(s=>s.id!==delBtn.dataset.delId));
-    renderHistory();
-    return;
-  }
+  const editBtn = ev.target.closest('.hist-sess-edit');
+  if(editBtn){ openSessionEdit(editBtn.dataset.editId); return; }
   const dateHead = ev.target.closest('.hist-date-head');
   if(dateHead){
     dateHead.nextElementSibling.classList.toggle('hide');
     return;
   }
 });
+
+/* ---- セッションの編集（重量・レップ・努力係数の修正、セット単位/セッション単位の削除） ---- */
+let seTarget = null;
+function renderSeSetList(sets){
+  $('#seSetList').innerHTML = sets.length ? sets.map((st,i)=>{
+    const hasSec = st.actualSec!=null;
+    return `<div class="se-row" data-idx="${i}">
+      <div class="se-row-ex">${st.exJa}</div>
+      <div class="se-row-fields">
+      <input type="number" class="se-w" step="0.5" placeholder="kg" value="${st.weightKg??''}">
+      ${hasSec
+        ? `<input type="number" class="se-sec" placeholder="秒" value="${st.actualSec??''}">`
+        : `<input type="number" class="se-r" placeholder="回" value="${st.actualReps??''}">`}
+      <select class="se-eff">
+        <option value="max" ${st.effort==='max'?'selected':''}>限界</option>
+        <option value="normal" ${st.effort==='normal'?'selected':''}>通常</option>
+        <option value="submax" ${st.effort==='submax'?'selected':''}>非限界</option>
+      </select>
+      <button type="button" class="se-row-del" title="この1セットを削除">&times;</button>
+      </div>
+    </div>`;
+  }).join('') : '<p class="hint">セットがありません。</p>';
+}
+function openSessionEdit(sessId){
+  const ss = loadSessions().find(s=>s.id===sessId); if(!ss) return;
+  seTarget = sessId;
+  $('#seTitle').textContent = `${ss.date} ・ ${ss.dayName}`;
+  $('#seSub').textContent = `${ss.sets.length}セット記録`;
+  renderSeSetList(ss.sets);
+  $('#sessionEditModal').classList.add('on');
+}
+$('#seSetList').addEventListener('click', ev=>{
+  const b = ev.target.closest('.se-row-del'); if(!b) return;
+  b.closest('.se-row').remove();
+});
+$('#seSave').addEventListener('click', ()=>{
+  if(!seTarget) return;
+  const list = loadSessions();
+  const ss = list.find(s=>s.id===seTarget); if(!ss) return;
+  const rows = [...$('#seSetList').querySelectorAll('.se-row')];
+  const newSets = rows.map(row=>{
+    const orig = ss.sets[+row.dataset.idx] || {};
+    const wRaw = row.querySelector('.se-w').value;
+    const secInput = row.querySelector('.se-sec');
+    const repInput = row.querySelector('.se-r');
+    return {
+      ...orig,
+      weightKg: wRaw==='' ? null : +wRaw,
+      actualReps: repInput ? (repInput.value===''?null:+repInput.value) : orig.actualReps,
+      actualSec: secInput ? (secInput.value===''?null:+secInput.value) : orig.actualSec,
+      effort: row.querySelector('.se-eff').value
+    };
+  });
+  if(!newSets.length){
+    if(!confirm('セットが0件になります。このセッション自体を削除しますか？')) return;
+    saveSessions(list.filter(s=>s.id!==seTarget));
+  } else {
+    ss.sets = newSets;
+    saveSessions(list);
+  }
+  $('#sessionEditModal').classList.remove('on'); seTarget = null;
+  renderHistory();
+  showToast('記録を更新しました');
+});
+$('#seDeleteAll').addEventListener('click', ()=>{
+  if(!seTarget) return;
+  if(!confirm('このセッションを削除しますか？元に戻せません。')) return;
+  saveSessions(loadSessions().filter(s=>s.id!==seTarget));
+  $('#sessionEditModal').classList.remove('on'); seTarget = null;
+  renderHistory();
+});
+$('#seClose').addEventListener('click', ()=>{ $('#sessionEditModal').classList.remove('on'); seTarget=null; });
+$('#sessionEditModal').addEventListener('click', e=>{ if(e.target.id==='sessionEditModal'){ $('#sessionEditModal').classList.remove('on'); seTarget=null; } });
 
 /* ============================================================
    10. マニュアルモード（Phase 4）
