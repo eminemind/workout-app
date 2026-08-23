@@ -552,6 +552,8 @@ input[type=number],input[type=text]{padding:8px 9px}
 .se-row .se-eff{flex:1.6}
 .se-row-del{background:var(--surface);border:1px solid var(--rule);border-radius:50%;width:26px;height:26px;line-height:1;cursor:pointer;color:var(--ink);flex:none}
 #seDeleteAll{color:var(--m-chest);border-color:var(--m-chest)}
+.armed{background:var(--m-chest)!important;color:var(--on-dark)!important;border-color:var(--m-chest)!important;animation:armPulse 1s ease-in-out infinite}
+@keyframes armPulse{0%,100%{opacity:1}50%{opacity:.6}}
 .hist-detail{min-height:1.6em;border-top:1px dashed var(--rule);padding-top:6px;margin-top:2px}
 .chart-hit{cursor:pointer}
 .hist-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 0 10px}
@@ -2672,9 +2674,8 @@ $('#menu').addEventListener('click',ev=>{
   if(b.dataset.act==='delblk'){
     const dayObj = manualPlan.days[di]; if(!dayObj) return;
     const idx = +b.dataset.bi;
-    if(!confirm('このブロックを削除しますか？')) return;
-    dayObj.blocks.splice(idx,1);
-    saveManualPlan(); render(); return;
+    armConfirm(b, 'もう一度で削除', ()=>{ dayObj.blocks.splice(idx,1); saveManualPlan(); render(); });
+    return;
   }
 
   const dir=b.dataset.dir;
@@ -2982,6 +2983,31 @@ function showToast(msg){
   document.body.appendChild(t);
   requestAnimationFrame(()=> t.classList.add('on'));
   setTimeout(()=>{ t.classList.remove('on'); setTimeout(()=>t.remove(), 400); }, 2600);
+}
+/* window.confirm()はLINE/Instagram等の埋め込みブラウザやPWA環境で
+   サイレントにブロックされることがあり、その場合「削除ボタンを押しても
+   何も起きない」ように見える（confirmが常にfalseを返す、または例外で
+   止まる）。ネイティブダイアログに頼らず、ボタン自体を一時的に
+   「もう一度押すと削除」に変えて2回タップさせる方式に統一する。 */
+function armConfirm(btn, label, onConfirm){
+  if(!btn) { onConfirm(); return; }
+  if(btn.dataset.armed==='1'){
+    if(btn._armTimer) clearTimeout(btn._armTimer);
+    delete btn.dataset.armed;
+    btn.textContent = btn.dataset.origLabel || btn.textContent;
+    btn.classList.remove('armed');
+    onConfirm();
+    return;
+  }
+  btn.dataset.armed = '1';
+  if(!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+  btn.textContent = label || 'もう一度タップで削除';
+  btn.classList.add('armed');
+  btn._armTimer = setTimeout(()=>{
+    delete btn.dataset.armed;
+    btn.textContent = btn.dataset.origLabel;
+    btn.classList.remove('armed');
+  }, 3000);
 }
 
 /* ============================================================
@@ -3762,22 +3788,27 @@ $('#seSave').addEventListener('click', ()=>{
     };
   });
   if(!newSets.length){
-    if(!confirm('セットが0件になります。このセッション自体を削除しますか？')) return;
-    saveSessions(list.filter(s=>s.id!==seTarget));
-  } else {
-    ss.sets = newSets;
-    saveSessions(list);
+    armConfirm($('#seSave'), 'もう一度でセッションごと削除', ()=>{
+      saveSessions(list.filter(s=>s.id!==seTarget));
+      $('#sessionEditModal').classList.remove('on'); seTarget = null;
+      renderHistory();
+      showToast('記録を削除しました');
+    });
+    return;
   }
+  ss.sets = newSets;
+  saveSessions(list);
   $('#sessionEditModal').classList.remove('on'); seTarget = null;
   renderHistory();
   showToast('記録を更新しました');
 });
 $('#seDeleteAll').addEventListener('click', ()=>{
   if(!seTarget) return;
-  if(!confirm('このセッションを削除しますか？元に戻せません。')) return;
-  saveSessions(loadSessions().filter(s=>s.id!==seTarget));
-  $('#sessionEditModal').classList.remove('on'); seTarget = null;
-  renderHistory();
+  armConfirm($('#seDeleteAll'), 'もう一度タップで削除', ()=>{
+    saveSessions(loadSessions().filter(s=>s.id!==seTarget));
+    $('#sessionEditModal').classList.remove('on'); seTarget = null;
+    renderHistory();
+  });
 });
 $('#seClose').addEventListener('click', ()=>{ $('#sessionEditModal').classList.remove('on'); seTarget=null; });
 $('#sessionEditModal').addEventListener('click', e=>{ if(e.target.id==='sessionEditModal'){ $('#sessionEditModal').classList.remove('on'); seTarget=null; } });
@@ -3885,7 +3916,7 @@ $('#manualPanel').addEventListener('click', ev=>{
   const dayBtn = ev.target.closest('[data-mday-act]');
   if(dayBtn){
     const di = +dayBtn.dataset.di, act = dayBtn.dataset.mdayAct;
-    if(act==='del'){ if(!confirm('この日を削除しますか？（中の種目もすべて削除されます）')) return; manualPlan.days.splice(di,1); }
+    if(act==='del'){ armConfirm(dayBtn, 'もう一度で削除', ()=>{ manualPlan.days.splice(di,1); saveManualPlan(); render(); }); return; }
     else if(act==='up' && di>0){ [manualPlan.days[di-1],manualPlan.days[di]]=[manualPlan.days[di],manualPlan.days[di-1]]; }
     else if(act==='down' && di<manualPlan.days.length-1){ [manualPlan.days[di+1],manualPlan.days[di]]=[manualPlan.days[di],manualPlan.days[di+1]]; }
     saveManualPlan(); render();
@@ -4085,13 +4116,14 @@ $('#beSave').addEventListener('click', ()=>{
 });
 $('#beDelete').addEventListener('click', ()=>{
   if(!blockEditTarget) return;
-  if(!confirm('このブロックを削除しますか？')) return;
-  const {di,bi} = blockEditTarget;
-  manualPlan.days[di].blocks.splice(bi,1);
-  saveManualPlan();
-  $('#blockEditModal').classList.remove('on');
-  blockEditTarget = null;
-  render();
+  armConfirm($('#beDelete'), 'もう一度で削除', ()=>{
+    const {di,bi} = blockEditTarget;
+    manualPlan.days[di].blocks.splice(bi,1);
+    saveManualPlan();
+    $('#blockEditModal').classList.remove('on');
+    blockEditTarget = null;
+    render();
+  });
 });
 
 /* ---- モード切替 ---- */
