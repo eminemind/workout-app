@@ -81,6 +81,20 @@ button,input,select{font-family:inherit;font-size:inherit;color:inherit}
 .mode-toggle{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-pill);padding:4px}
 .mode-toggle button{flex:1;background:transparent;border:0;padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted);border-radius:var(--radius-pill)}
 .mode-toggle button.on{background:var(--ink);color:var(--on-dark)}
+/* 設定/メニューの表示切替タブ。広い画面では左右2カラムが同時に見えるので
+   不要だが、940px以下では縦に積まれ、メニューに辿り着くまで設定を延々と
+   スクロールする羽目になる。狭い画面でのみタブとして機能させる。 */
+.view-tabs{display:none;position:sticky;top:0;z-index:30;margin:14px 0 2px}
+@media(max-width:940px){
+  .view-tabs{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--rule);
+    border-radius:var(--radius-pill);padding:4px;
+    backdrop-filter:blur(var(--blur)) saturate(170%);-webkit-backdrop-filter:blur(var(--blur)) saturate(170%)}
+  .view-tabs button{flex:1;background:transparent;border:0;padding:9px;font-size:12.5px;
+    font-weight:700;cursor:pointer;color:var(--muted);border-radius:var(--radius-pill)}
+  .view-tabs button.on{background:var(--ink);color:var(--on-dark)}
+  .cols[data-view="menu"] > .panel{display:none}
+  .cols[data-view="setup"] > .results{display:none}
+}
 .manual-day-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .manual-day-name{flex:1;background:var(--surface-2);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:8px 9px;font-size:13px;font-weight:600}
 .manual-day-acts{display:flex;gap:2px;flex:none}
@@ -623,7 +637,12 @@ input[type=number],input[type=text]{padding:8px 9px}
     </details>
   </header>
 
-  <div class="cols">
+  <div class="view-tabs" id="viewTabs">
+    <button data-view="setup">前提条件・設定</button>
+    <button data-view="menu" class="on">トレーニングメニュー</button>
+  </div>
+
+  <div class="cols" id="cols" data-view="menu">
     <aside class="panel">
       <div class="step">
         <div class="step-head"><span class="step-no">00</span><span class="step-title">モード</span></div>
@@ -653,13 +672,20 @@ input[type=number],input[type=text]{padding:8px 9px}
       </div>
 
       <div class="step">
-        <div class="step-head"><span class="step-no">02</span><span class="step-title">使える設備</span></div>
+        <div class="step-head"><span class="step-no">02</span><span class="step-title">目指したい体型</span></div>
+        <div class="field"><select id="goal"></select></div>
+        <p class="hint" id="goalHint" style="margin-top:10px"></p>
+        <p class="hint warn-hint hide" id="goalMinWarn" style="margin-top:6px"></p>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="step-no">03</span><span class="step-title">使える設備</span></div>
         <p class="hint">今日行くジムに置いてあるものだけ。自重種目は常に使えます。</p>
         <div class="chips" id="equip"></div>
       </div>
 
       <div class="step">
-        <div class="step-head"><span class="step-no">03</span><span class="step-title">時間とインターバル</span></div>
+        <div class="step-head"><span class="step-no">04</span><span class="step-title">時間とインターバル</span></div>
         <div class="row">
           <div class="field"><label>回数 / 週</label>
             <select id="days"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></div>
@@ -673,12 +699,6 @@ input[type=number],input[type=text]{padding:8px 9px}
         <p class="hint" id="timeHint" style="margin-top:10px"></p>
       </div>
 
-      <div class="step">
-        <div class="step-head"><span class="step-no">04</span><span class="step-title">目指したい体型</span></div>
-        <div class="field"><select id="goal"></select></div>
-        <p class="hint" id="goalHint" style="margin-top:10px"></p>
-        <p class="hint warn-hint hide" id="goalMinWarn" style="margin-top:6px"></p>
-      </div>
       </div><!-- /#autoSteps -->
 
       <div id="manualPanel" class="hide"></div>
@@ -3607,8 +3627,7 @@ function svgHeatmap(dayTrained, weeksBack){
     const monthKey = colDate.getFullYear()+'-'+colDate.getMonth();
     if(monthKey !== lastMonth){
       lastMonth = monthKey;
-      const weekOfMonth = Math.ceil((colDate.getDate())/7);
-      monthLabels += `<text x="${labelColW + w*(cell+gap)}" y="${labelRowH-4}" font-size="9" fill="var(--muted)">${colDate.getMonth()+1}月第${weekOfMonth}週</text>`;
+      monthLabels += `<text x="${labelColW + w*(cell+gap)}" y="${labelRowH-4}" font-size="9" fill="var(--muted)">${colDate.getMonth()+1}月</text>`;
     }
     for(let d=0; d<7; d++){
       const date = new Date(start.getTime() + (w*7+d)*86400000);
@@ -3675,7 +3694,7 @@ function renderHistory(){
   const dayTrained = {};
   all.forEach(ss=>{ dayTrained[ss.date] = true; });
   html += `<h4 class="hist-h">継続の記録（直近10週）</h4>
-    <p class="hint">1マス＝1日。濃い色＝その日トレーニングした（種目や量は問わない）。横は曜日、縦の見出しは月と第何週かを示します。タップで日付を確認できます。</p>
+    <p class="hint">1マス＝1日。濃い色＝その日トレーニングした（種目や量は問わない）。横は曜日、上の見出しは月を示します。タップで日付を確認できます。</p>
     <div class="hist-heat" id="histHeatChart">${svgHeatmap(dayTrained,10)}</div>
     <p class="hint hist-detail" id="histHeatDetail">マスをタップすると、ここに詳細が出ます。</p>`;
 
@@ -4299,6 +4318,22 @@ $('#beDelete').addEventListener('click', ()=>{
     render();
   });
 });
+
+/* ---- 設定/メニューの表示切替（狭い画面のみ有効。CSS側でタブごと隠れる） ---- */
+function setView(v){
+  $('#cols').dataset.view = v;
+  $('#viewTabs').querySelectorAll('button').forEach(x=> x.classList.toggle('on', x.dataset.view===v));
+  try{ localStorage.setItem('workoutView', v); }catch(e){}
+}
+$('#viewTabs').addEventListener('click', ev=>{
+  const b = ev.target.closest('button[data-view]'); if(!b) return;
+  setView(b.dataset.view);
+  window.scrollTo({top:0, behavior:'instant'});
+});
+try{
+  const sv = localStorage.getItem('workoutView');
+  if(sv==='setup'||sv==='menu') setView(sv);
+}catch(e){}
 
 /* ---- モード切替 ---- */
 function syncModeUI(){
