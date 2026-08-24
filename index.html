@@ -1597,6 +1597,12 @@ function effortFactor(b){
    つまり倍率を掛けると同じ効果を二重に数えることになる（短い休憩で高重量は物理的に維持できない）。
    実際、主要なトレーニング計算ツールも休憩時間をボリューム計算の乗数には使っていない。
    ここでは代謝的ストレスのぶんだけを、±10%に収まる控えめな補正として残す。 */
+/* #minsセレクトが持つ選択肢（分）。プリセットの所要時間を最も近い選択肢へ
+   丸めるために使う。 */
+function minsOptions(){
+  return [...$('#mins').options].map(o=>+o.value || +o.textContent);
+}
+
 function restModifier(restSec){
   return Math.max(0.90, Math.min(1.10, 1 + (60 - restSec)/600));
 }
@@ -2179,8 +2185,11 @@ function renderAuto(){
   const goal=GOALS.find(g=>g.id===$('#goal').value);
   $('#goalHint').textContent = goal.hint;
   const minWarn = $('#goalMinWarn');
-  const shortDays = goal.minDays && days < goal.minDays;
-  const shortMins = goal.minMins && mins < goal.minMins;
+  /* 考案者プリセットは日数・時間が考案者の構成どおりに固定されており（#daysは
+     disabled）、目標の最低ラインと比べても利用者が変えようがない。警告は
+     利用者が自分で日数・時間を決める標準モードでのみ意味を持つ。 */
+  const shortDays = !isPreset && goal.minDays && days < goal.minDays;
+  const shortMins = !isPreset && goal.minMins && mins < goal.minMins;
   if(shortDays || shortMins){
     minWarn.textContent = `⚠ ${goal.ja}には最低でも週${goal.minDays}日・1回${goal.minMins}分が目安です`
       + (shortDays&&shortMins ? `（現在：週${days}日・${mins}分）` : shortDays ? `（現在：週${days}日）` : `（現在：${mins}分）`);
@@ -2201,8 +2210,23 @@ function renderAuto(){
   currentWk = wk; currentMethod = method;
   if(isPreset){ $('#days').value=String(Math.max(1,Math.min(6,Math.round(wk.spw)))); $('#days').disabled=true; }
 
-  $('#timeHint').innerHTML = `1回<b>${mins}分</b>から準備<b>10分</b>を引いた<b>${mins-10}分</b>が、ブロックを詰められる枠です。`
-    + (isPreset?`<br>この手法はプリセットです。ワークアウトは<b>${wk.rot}種類</b>、実施は<b>週${rnd(wk.spw)}回</b>で固定されます（種類数と回数は別物です）。`:'')
+  /* プリセットは内容が考案者の構成に固定されており、mins（1回の時間）は
+     ブロックの取捨に一切影響しない。利用者が選ぶ枠ではなく、考案者の構成
+     から実際に必要な時間を逆算して表示・固定する。 */
+  let dispMins = mins;
+  if(isPreset){
+    const avgSec = wk.plans.reduce((s,p)=>s+p.sec,0)/Math.max(1,wk.plans.length);
+    const needMins = Math.round(avgSec/60) + 10; // 準備10分を含む
+    dispMins = minsOptions().reduce((best,v)=>
+      Math.abs(v-needMins) < Math.abs(best-needMins) ? v : best);
+    $('#mins').value = String(dispMins);
+    $('#mins').disabled = true;
+  } else $('#mins').disabled = false;
+
+  $('#timeHint').innerHTML = (isPreset
+      ? `1回<b>${dispMins}分</b>（準備10分を含む）は、<b>考案者の構成から逆算した目安</b>です。`
+      : `1回<b>${dispMins}分</b>から準備<b>10分</b>を引いた<b>${dispMins-10}分</b>が、ブロックを詰められる枠です。`)
+    + (isPreset?`<br>この手法はプリセットです。ワークアウトは<b>${wk.rot}種類</b>、実施は<b>週${rnd(wk.spw)}回</b>、1回の時間も考案者の構成どおりに固定されます（種類数と回数は別物です）。`:'')
     + (restSel.disabled?`<br>インターバルもこの手法が規定するため変更できません。`:'')
     + (method.goal?`<br>この手法は目標を「${GOALS.find(g=>g.id===method.goal).ja}」に固定します。`:'')
     + (method.pro?`<br><b>内容は考案者の構成に固定されており、時間を増やしても自動では増えません。</b>増やしたい場合は「＋ 種目を追加」か、各種目の「編集」でセット・レップ数を変えてください。`:'');
@@ -2231,7 +2255,7 @@ function renderAuto(){
     $('#bmiHint').textContent = '';
   }
   setCredo(method);
-  drawMenu({method, wk, mins});
+  drawMenu({method, wk, mins:dispMins});
   $('#resetSwap').classList.toggle('hide', !Object.keys(overrides).length && !Object.keys(blockOrder).length && !Object.keys(exOrder).length && !Object.keys(setsRepsOv).length && !Object.keys(manualAdds).length && !Object.keys(weightOv).length);
   drawFoot();
   const isP = wk.isPreset;
